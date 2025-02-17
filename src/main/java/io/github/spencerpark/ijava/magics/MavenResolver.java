@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2022 ${author}
+ * Copyright (c) 2024 ${author}
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -58,7 +58,7 @@ public class MavenResolver {
     public MavenResolver(Consumer<String> addToClasspath) {
         this.addToClasspath = addToClasspath;
         // central
-        this.addRemoteRepo("central", "http://central.maven.org/maven2/");
+        this.addRemoteRepo("central", "https://repo.maven.apache.org/maven2/");
     }
 
     private void addRemoteRepo(String id, String url) {

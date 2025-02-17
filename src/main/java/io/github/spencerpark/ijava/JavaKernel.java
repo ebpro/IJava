@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2022 ${author}
+ * Copyright (c) 2024 ${author}
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -78,7 +78,7 @@ public class JavaKernel extends BaseKernel {
 
     private final StringStyler errorStyler;
 
-    public static boolean printWithVarName = true;
+    public static boolean printWithVarName = false;
     // jupyter support ANSI_escape_code, java ansi code demo: https://stackoverflow.com/a/5762502
     private static String varNamePattern = "\u001B[36m%s\u001B[0m: ";
     private Long snippetId = 0L;
@@ -97,7 +97,7 @@ public class JavaKernel extends BaseKernel {
                 .addClasspathFromString(System.getenv(IJava.CLASSPATH_KEY))
                 .compilerOptsFromString(System.getenv(IJava.COMPILER_OPTS_KEY))
                 .startupScript(IJava.resource(IJava.DEFAULT_SHELL_INIT_RESOURCE_PATH))
-                .startupScript(IJava.resource(IJava.SHELL_INIT_RESOURCE_PATH_PRINTER))
+                //.startupScript(IJava.resource(IJava.SHELL_INIT_RESOURCE_PATH_PRINTER))
                 .startupScriptFiles(System.getenv(IJava.STARTUP_SCRIPTS_KEY))
                 .startupScript(System.getenv(IJava.STARTUP_SCRIPT_KEY))
                 .timeoutFromString(System.getenv(IJava.TIMEOUT_DURATION_KEY))
@@ -139,14 +139,14 @@ public class JavaKernel extends BaseKernel {
                 .preferring(MIMEType.APPLICATION_JSON)
                 .register((data, context) -> context.renderIfRequested(MIMEType.APPLICATION_JSON, () -> data));
 
-        this.errorStyler = new StringStyler.Builder()
+         this.errorStyler = new StringStyler.Builder()
                 .addPrimaryStyle(TextColor.BOLD_BLACK_FG)
                 .addSecondaryStyle(TextColor.BOLD_RED_FG)
                 .addHighlightStyle(TextColor.BOLD_BLACK_FG)
                 .addHighlightStyle(TextColor.RED_BG)
                 //TODO map snippet ids to code cells and put the proper line number in the margin here
                 .withLinePrefix(TextColor.BOLD_BLACK_FG + "|   ")
-                .build();
+                .build(); 
     }
 
     public void addToClasspath(String path) {
@@ -180,6 +180,7 @@ public class JavaKernel extends BaseKernel {
         return this.helpLinks;
     }
 
+    
     @Override
     public List<String> formatError(Exception e) {
         if (e instanceof CompilationException compilationexception) {
@@ -241,6 +242,7 @@ public class JavaKernel extends BaseKernel {
     private List<String> formatEvalException(EvalException e) {
         List<String> fmt = new ArrayList<>();
 
+        fmt.add("Execution exception"); 
         String evalExceptionClassName = EvalException.class.getName();
         String actualExceptionName = e.getExceptionClassName();
         super.formatError(e).stream()
@@ -298,7 +300,7 @@ public class JavaKernel extends BaseKernel {
         if (result == null) return null;
         if (result instanceof DisplayData displayData) return displayData;
 
-        if (printWithVarName) {
+       /* if (printWithVarName) {
             Optional<Snippet> lastSnippet = this.evaluator.getShell().snippets().skip(snippetId).reduce((first, second) -> second);
             if (lastSnippet.isPresent()) {
                 Snippet snippet = lastSnippet.get();
@@ -309,8 +311,8 @@ public class JavaKernel extends BaseKernel {
                     if (sourceStr.length() > 32) sourceStr = sourceStr.substring(0, 32) + "...";
                     return this.getRenderer().render(String.format(varNamePattern, sourceStr) + result);
                 }
-            }
-        }
+            } 
+        } */
 
         return this.getRenderer().render(result);
     }
