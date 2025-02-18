@@ -1,1 +1,39 @@
+/*
+ * Project Settings for IJava Jupyter Kernel
+ */
+
+// Project identification
 rootProject.name = 'IJava'
+
+// Enable build cache
+buildCache {
+    local {
+        enabled = true
+        directory = new File(rootDir, '.gradle/build-cache')
+    }
+}
+
+// Set Java compatibility
+ext {
+    minJavaVersion = JavaVersion.VERSION_21
+    targetJavaVersion = JavaVersion.VERSION_21
+}
+
+// Verify Java version
+def javaVersion = org.gradle.internal.jvm.Jvm.current().javaVersion
+def minVersion = JavaVersion.toVersion(minJavaVersion)
+
+if (javaVersion < minVersion) {
+    throw new GradleException("""
+        ⚠️ Incompatible Java version
+        Required: ${minVersion} or higher
+        Current:  ${javaVersion}
+        Please update your Java installation.
+        """.stripIndent())
+}
+
+// Configure included builds if any
+// includeBuild '../other-project'
+
+// Configure settings
+gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS_FULL

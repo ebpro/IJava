@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2024 ${author}
+ * Copyright (c) 2025 ${author}
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -42,8 +42,9 @@ import jdk.jshell.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.codehaus.plexus.util.cli.shell.Shell;
 
 public class JavaKernel extends BaseKernel {
     public static String completeCodeSignifier() {
@@ -115,6 +116,13 @@ public class JavaKernel extends BaseKernel {
         magics.registerMagics(new MagicsTool());
         magics.registerMagics(new TimeItMagics());
         magics.registerMagics(new CompilerMagics(this::addToClasspath));
+        magics.registerMagics(new JavaCompilerMagics());
+        magics.registerMagics(new JavaDBMSMagics());
+        magics.registerMagics(new JavaMagics());
+        magics.registerMagics(new JavaPlantUMLMagics());
+        magics.registerMagics(new ShellMagics());
+        magics.registerMagics(new SingleShellMagics());
+        magics.registerMagics(new Shell());
 
         this.languageInfo = new LanguageInfo.Builder("Java")
                 .version(Runtime.version().toString())

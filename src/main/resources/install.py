@@ -165,7 +165,7 @@ if __name__ == '__main__':
         kernel_name='java',
         user=args.user,
         prefix=sys.prefix if args.sys_prefix else args.prefix,
-        replace=args.replace
+        ## replace=args.replace
     )
 
     # Connect the self referencing token left in the kernel.json to point to it's install location.

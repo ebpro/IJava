@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2024 ${author}
+ * Copyright (c) 2025 ${author}
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -144,8 +144,8 @@ public class IJavaExecutionControl extends DirectExecutionControl {
      * leak the memory.
      * <p></p>
      * {@inheritDoc}
-     *
-     * @returns the key to use for {@link #takeResult(String) looking up the result}.
+     * 
+     * @return the key to use for {@link #takeResult(String) looking up the result}.
      */
     @Override
     protected String invoke(Method doitMethod) throws Exception {

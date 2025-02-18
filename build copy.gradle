@@ -1,0 +1,165 @@
+import com.github.jk1.license.filter.LicenseBundleNormalizer
+import com.github.jk1.license.render.InventoryHtmlReportRenderer
+import com.github.jk1.license.render.JsonReportRenderer
+import org.apache.tools.ant.filters.ReplaceTokens
+
+
+plugins {
+    id 'java-library'
+    // id 'maven-publish' // use johnrengelman.shadow instead
+    id 'com.github.hierynomus.license' version '0.16.1'
+    id "com.github.jk1.dependency-license-report" version "2.1"
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+//    id 'io.github.spencerpark.jupyter-kernel-installer'  version '2.1.0'
+}
+
+group = 'io.github.spencerpark'
+version = '1.4.4'
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        url = 'https://oss.sonatype.org/content/repositories/snapshots/'
+    }
+}
+
+dependencies {
+    implementation('io.github.spencerpark:jupyter-jvm-basekernel:2.3.0') {
+        exclude group: 'com.google.code.gson', module: 'gson'
+    }
+    implementation 'com.google.code.gson:gson:2.10'
+
+    // ------ for maven resolve and download ------
+    // implementation 'org.apache.maven:maven-resolver-provider:4.0.0-alpha-2'
+    implementation('org.apache.maven:maven-resolver-provider:3.8.6') {
+        exclude group: 'org.apache.maven.resolver'  // manual include 1.8.2
+    }
+    implementation 'org.apache.maven.resolver:maven-resolver-impl:1.8.2'
+    implementation 'org.apache.maven.resolver:maven-resolver-connector-basic:1.8.2'
+    implementation 'org.apache.maven.resolver:maven-resolver-transport-file:1.8.2'
+    implementation 'org.apache.maven.resolver:maven-resolver-transport-http:1.8.2'
+    implementation 'org.apache.maven.resolver:maven-resolver-transport-classpath:1.8.2'
+    // ------ for maven resolve and download ------
+
+    //implementation 'org.apache.logging.log4j:log4j-core:2.19.0'
+    implementation 'ch.qos.logback:logback-classic:1.5.7'
+
+    testImplementation group: 'junit', name: 'junit', version: '4.13.2'
+}
+
+// Add the license header to source files
+license {
+    header = file('LICENSE')
+    include "**/*.java"
+    exclude "**/Test*.java"
+    mapping java: 'SLASHSTAR_STYLE'
+    ext.year = Calendar.getInstance().get(Calendar.YEAR)
+}
+licenseMain.dependsOn 'licenseFormat'
+
+// replace @symbol@ in properties
+processResources {
+    def tokens = [
+            'version': project.version,
+            'project': project.name
+    ]
+    inputs.properties(tokens)
+    filter tokens: tokens, ReplaceTokens
+}
+
+//java {
+//    withJavadocJar()
+//    withSourcesJar()
+//}
+
+compileJava {
+    options.compilerArgs << '-parameters'
+    // ignore deprecation for jupyter-jvm-basekernel gson JsonParser api
+//    options.compilerArgs << '-Xlint:all' << '-Xlint:-deprecation' << '-Xlint:-rawtypes' << '-Xlint:-serial'
+}
+
+jar {
+    manifest {
+        attributes 'Main-class': 'io.github.spencerpark.ijava.IJava'
+    }
+}
+
+// shadow Jar config
+shadowJar {
+    // inherit from the manifest of the standard jar task
+    //    manifest {
+    //        attributes 'Main-class': 'io.github.spencerpark.ijava.IJava'
+    //    }
+
+    // copy build.gradle to shadowed jar
+    from("./") {
+        include 'build.gradle'
+    }
+}
+build.dependsOn 'shadowJar'
+
+// publish
+//publishing {
+//    publications {
+//        shadow(MavenPublication) { publication ->
+//            project.shadow.component(publication)
+//        }
+//    }
+//    repositories {
+//        maven {
+//            url "http://repo.myorg.com"
+//        }
+//    }
+//}
+
+// create license report
+licenseReport {
+    renderers = [
+            new InventoryHtmlReportRenderer('license-report.html'),
+            new JsonReportRenderer('license-report.json')
+    ]
+
+    filters = [new LicenseBundleNormalizer()]
+}
+
+// pack up
+tasks.register('packDist', Zip) {
+    archiveFileName = project.name + "-latest.zip"
+
+    from(layout.buildDirectory.dir("resources/main")) {
+        include "install.py"
+    }
+
+    from(layout.buildDirectory.dir("libs")) {
+        include "*-all.jar"
+        into "java"
+    }
+
+    from(layout.buildDirectory.dir("resources/main")) {
+        include "kernel.json"
+        into "java"
+    }
+
+    from(layout.buildDirectory.dir("reports/dependency-license")) {
+        into "java/dependency-license"
+    }
+
+    dependsOn generateLicenseReport
+    dependsOn build
+}
+
+// execute task after build
+//build.finalizedBy(packDist)
+
+
+// Task to download dependencies
+tasks.register('downloadDependencies') {
+    doLast {
+        configurations.all { configuration ->
+            if (configuration.canBeResolved) {
+                configuration.resolve()
+            }
+        }
+    }
+}
