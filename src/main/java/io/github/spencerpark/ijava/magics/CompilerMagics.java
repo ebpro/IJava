@@ -49,8 +49,8 @@ public class CompilerMagics {
         this.addToClasspath = addToClasspath;
     }
 
-    @CellMagic(aliases = {"compile"})
-    public void compile(List<String> args, String body) {
+    @CellMagic("mycompile")
+    public void mycompile(List<String> args, String body) {
         if (args.isEmpty()) throw new RuntimeException("Please specify *Class Canonical Name* in args!");
 
         // 1. autofill package base on class canonical name

@@ -31,7 +31,9 @@ import java.util.function.Consumer;
 import java.util.List;
 import java.util.concurrent.Executors;
 import io.github.spencerpark.jupyter.kernel.magic.registry.CellMagic;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class ShellMagics {
 
     private static class StreamGobbler implements Runnable {
@@ -50,8 +52,8 @@ public class ShellMagics {
         }
     }
 
-    @CellMagic(aliases = { "runshell" })
-    public void shell(List<String> args, String body) {
+    @CellMagic("shell")
+    public void shell(List<String> args, String body) throws InterruptedException, IOException {
         String[] commands = { "zsh", "-c", body };
         Process process;
         try {
@@ -61,11 +63,13 @@ public class ShellMagics {
             StreamGobbler streamGobblerErr = new StreamGobbler(process.getErrorStream(), System.err::println);
             Executors.newSingleThreadExecutor().submit(streamGobbler);
             Executors.newSingleThreadExecutor().submit(streamGobblerErr);
+            process.waitFor();
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("Error while running shell command", e);
+            throw e;       
+        } catch (InterruptedException e) {
+            log.error("Error while waiting for process to finish", e);
+            throw e;
         }
-
-        // return process.waitFor();
     }
-
 }
