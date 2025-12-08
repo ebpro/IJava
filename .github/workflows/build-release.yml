@@ -43,9 +43,11 @@ jobs:
           ls -l "$ARTIFACT" "$ARTIFACT.sha256"
 
       - name: Create GitHub Release and upload assets
-        uses: ncipollo/release-action@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
         with:
-          tag: ${{ github.ref_name }}
+          # include a release body if you maintain UPGRADE.md or CHANGELOG
+          body_path: UPGRADE.md
           files: |
             build/distributions/*.zip
             build/distributions/*.zip.sha256
