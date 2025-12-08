@@ -96,20 +96,20 @@ shadowJar {
     // copy build.gradle to shadowed jar
     from("./") {
         include 'build.gradle'
-    }    
+    }
 }
 
 // Distribution package
 tasks.register('packDist', Zip) {
     description = 'Creates distribution package'
     group = 'distribution'
-    
+
     archiveFileName = "${project.name}-latest.zip"
-    
+
     from(layout.buildDirectory.dir("resources/main")) {
         include "install.py"
     }
-    
+
     from(layout.buildDirectory.dir("libs")) {
         include "*-all.jar"
         into "java"
@@ -117,12 +117,12 @@ tasks.register('packDist', Zip) {
             filename.replace("-all.jar", ".jar")
         }
     }
-    
+
     from(layout.buildDirectory.dir("resources/main")) {
         include "kernel.json"
         into "java"
     }
-    
+
     // Ensure shadowJar task runs before packaging
     dependsOn shadowJar
     dependsOn processResources
@@ -132,7 +132,7 @@ tasks.register('packDist', Zip) {
 tasks.register('downloadDependencies') {
     description = 'Downloads all dependencies'
     group = 'build setup'
-    
+
     doLast {
         configurations.all { configuration ->
             if (configuration.canBeResolved) {
