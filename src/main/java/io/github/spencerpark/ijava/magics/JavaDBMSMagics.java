@@ -268,6 +268,30 @@ public class JavaDBMSMagics {
     private Connection obtainConnection() throws SQLException {
         String url = System.getProperty("jdbc.url");
         if (url != null && !url.isBlank()) {
+            // Attempt to ensure a JDBC driver is loaded. Users can set `jdbc.driver` system property
+            // to force a specific driver class, or we try a few common drivers (H2, Postgres, MySQL, HSQLDB, SQLite).
+            String driverProp = System.getProperty("jdbc.driver");
+            if (driverProp != null && !driverProp.isBlank()) {
+                try {
+                    Class.forName(driverProp);
+                } catch (ClassNotFoundException ignored) {
+                }
+            } else {
+                String[] commonDrivers = new String[]{
+                        "org.h2.Driver",
+                        "org.postgresql.Driver",
+                        "com.mysql.cj.jdbc.Driver",
+                        "org.hsqldb.jdbc.JDBCDriver",
+                        "org.sqlite.JDBC"
+                };
+                for (String d : commonDrivers) {
+                    try {
+                        Class.forName(d);
+                    } catch (ClassNotFoundException ignored) {
+                    }
+                }
+            }
+
             String user = System.getProperty("jdbc.user");
             String pass = System.getProperty("jdbc.password");
             if (user != null) return DriverManager.getConnection(url, user, pass == null ? "" : pass);
@@ -299,7 +323,7 @@ public class JavaDBMSMagics {
                 }
             } catch (NoSuchMethodException ignored) {
             }
-        } catch (ClassNotFoundException | ReflectiveOperationException ignored) {
+        } catch (ReflectiveOperationException ignored) {
         }
 
         return null;
