@@ -3,3 +3,17 @@
 build/
 out/.vscode
 .idea/
+
+# Ignore generated notebook artifacts
+docs/notebooks/example.txt
+docs/notebooks/ijava_sample_notebook.html
+docs/notebooks/generated_html/
+
+# Installer/script outputs
+install.sh
+
+# Generated java resources
+src/main/resources/java/
+
+# Tests artifacts
+tests/
