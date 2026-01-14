@@ -2,6 +2,15 @@ package io.github.spencerpark.ijava.magics;
 
 import io.github.spencerpark.jupyter.kernel.magic.registry.CellMagic;
 
+import net.sourceforge.plantuml.FileFormat;
+import net.sourceforge.plantuml.FileFormatOption;
+import net.sourceforge.plantuml.SourceStringReader;
+import net.sourceforge.plantuml.core.DiagramDescription;
+
+import javax.imageio.ImageIO;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.Charset;
 import java.sql.*;
 import java.util.Map;
 import java.util.TreeMap;
@@ -124,23 +133,87 @@ public class JavaDBMSMagics {
             }
 
             DatabaseMetaData md = conn.getMetaData();
-            ResultSet tables = md.getTables(null, schema, "%", new String[]{"TABLE"});
-            StringBuilder sb = new StringBuilder();
-            while (tables.next()) {
-                String tableName = tables.getString("TABLE_NAME");
-                sb.append("Table: ").append(tableName).append("\n");
-                ResultSet cols = md.getColumns(null, schema, tableName, "%");
-                while (cols.next()) {
-                    String colName = cols.getString("COLUMN_NAME");
-                    String type = cols.getString("TYPE_NAME");
-                    String size = cols.getString("COLUMN_SIZE");
-                    String nullable = cols.getInt("NULLABLE") == DatabaseMetaData.columnNullable ? "YES" : "NO";
-                    sb.append(String.format("  %s %s(%s) nullable=%s\n", colName, type, size, nullable));
+
+            StringBuilder out = new StringBuilder();
+            out.append("@startuml\n");
+            out.append("left to right direction\n");
+            out.append("skinparam roundcorner 5\n");
+            out.append("skinparam shadowing true\n");
+            out.append("skinparam handwritten false\n");
+            out.append("skinparam class { BackgroundColor #EEEEEE ArrowColor #2688d4 BorderColor #2688d4 }\n");
+            out.append("!define primary_key(x) <b><color:#b8861b><&key></color> x</b>\n");
+            out.append("!define foreign_key(x) <color:#aaaaaa><&key></color> x\n");
+            out.append("!define column(x) <color:#efefef><&media-record></color> x\n");
+            out.append("!define table(x) entity x << (T, white) >>\n\n");
+
+            // iterate tables (if body contains specific table names, honor them)
+            java.util.List<String> tableNames = new java.util.ArrayList<>();
+            if (body != null && !body.trim().isEmpty()) {
+                for (String line : body.split("\n")) {
+                    String l = line.trim();
+                    if (!l.isEmpty()) tableNames.add(l);
                 }
-                sb.append("\n");
             }
-            display(sb.toString(), "text/plain");
-        } catch (SQLException e) {
+
+            if (tableNames.isEmpty()) {
+                try (ResultSet tables = md.getTables(null, schema, "%", new String[]{"TABLE"})) {
+                    while (tables.next()) tableNames.add(tables.getString("TABLE_NAME"));
+                }
+            }
+
+            StringBuilder fkBuilder = new StringBuilder();
+
+            for (String tableName : tableNames) {
+                Table table = new Table(tableName);
+
+                // columns
+                try (ResultSet columns = md.getColumns(null, schema, tableName, null)) {
+                    while (columns.next()) {
+                        String columnName = columns.getString("COLUMN_NAME");
+                        table.getFields().put(columnName,
+                                Field.of(columnName,
+                                        columns.getString("COLUMN_SIZE"),
+                                        columns.getString("TYPE_NAME"),
+                                        columns.getString("IS_NULLABLE").equalsIgnoreCase("YES"),
+                                        "YES".equalsIgnoreCase(columns.getString("IS_AUTOINCREMENT"))));
+                    }
+                }
+
+                // primary keys
+                try (ResultSet primaryKeys = md.getPrimaryKeys(null, schema, tableName)) {
+                    while (primaryKeys.next()) {
+                        String pkCol = primaryKeys.getString("COLUMN_NAME");
+                        if (table.getFields().containsKey(pkCol)) table.getFields().get(pkCol).setRole(Field.Role.PK);
+                    }
+                }
+
+                // foreign keys
+                try (ResultSet foreignKeys = md.getImportedKeys(null, schema, tableName)) {
+                    while (foreignKeys.next()) {
+                        String pkTable = foreignKeys.getString("PKTABLE_NAME");
+                        String fkTable = foreignKeys.getString("FKTABLE_NAME");
+                        String pkCol = foreignKeys.getString("PKCOLUMN_NAME");
+                        String fkCol = foreignKeys.getString("FKCOLUMN_NAME");
+                        if (table.getFields().containsKey(fkCol)) table.getFields().get(fkCol).setRole(Field.Role.FK);
+                        fkBuilder.append(String.format("%s::%s --> %s::%s\n", fkTable, fkCol, pkTable, pkCol));
+                    }
+                }
+
+                out.append(table.toString());
+            }
+
+            out.append(fkBuilder.toString());
+            out.append("@enduml");
+
+            // render via PlantUML as SVG
+            SourceStringReader reader = new SourceStringReader(out.toString());
+            final ByteArrayOutputStream os = new ByteArrayOutputStream();
+            DiagramDescription desc = reader.outputImage(os, new FileFormatOption(FileFormat.SVG));
+            os.close();
+            String svg = new String(os.toByteArray(), Charset.forName("UTF-8"));
+            display(svg, "image/svg+xml");
+
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
