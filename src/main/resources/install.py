@@ -183,11 +183,31 @@ if __name__ == '__main__':
     # in the installed kernel.json from the local template.
     with open(local_kernel_json_path, 'r') as template_kernel_json_file:
         template_kernel_json_contents = template_kernel_json_file.read()
+        # Load the template JSON and programmatically update fields so we can
+        # point argv to the actual jar bundled in the `java/` subdirectory.
         kernel_json_contents = template_kernel_json_contents.replace(
             '@KERNEL_INSTALL_DIRECTORY@',
             install_dest_json_fragment
         )
         kernel_json_json_contents = json.loads(kernel_json_contents)
+
+        # If the distribution contains a jar in the installed 'java' folder,
+        # set argv[2] to that jar path so the kernelspec points at the real file.
+        try:
+            java_dir = os.path.join(install_dest, 'java')
+            if os.path.isdir(java_dir):
+                # prefer any jar (first alphabetical) - this will be the renamed shadow jar
+                jars = sorted([f for f in os.listdir(java_dir) if f.endswith('.jar')])
+                if jars:
+                    jar_path = os.path.join(install_dest, 'java', jars[-1])
+                    argv = kernel_json_json_contents.get('argv')
+                    if isinstance(argv, list) and len(argv) > 2:
+                        argv[2] = jar_path
+                        kernel_json_json_contents['argv'] = argv
+        except Exception:
+            # best-effort: do not fail install if we cannot locate the jar
+            pass
+
         kernel_env = kernel_json_json_contents.setdefault('env', {})
         for k, v in args.env.items():
             kernel_env[k] = v
