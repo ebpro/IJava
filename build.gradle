@@ -62,7 +62,9 @@ dependencies {
     implementation 'com.github.javaparser:javaparser-core:3.25.8'
     implementation 'com.github.javaparser:javaparser-symbol-solver-core:3.25.8'
     // PlantUML for diagrams
-    implementation 'net.sourceforge.plantuml:plantuml:1.2024.1'
+    //implementation 'net.sourceforge.plantuml:plantuml:1.2024.1'
+    implementation 'net.sourceforge.plantuml:plantuml:1.2026.0'
+
     // ClassGraph for classpath scanning
     implementation 'io.github.classgraph:classgraph:4.8.168'
     // Lombok for annotations processing

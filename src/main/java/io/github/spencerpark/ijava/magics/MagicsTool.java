@@ -23,6 +23,7 @@
  */
 package io.github.spencerpark.ijava.magics;
 
+import lombok.extern.slf4j.Slf4j;
 import io.github.spencerpark.ijava.IJava;
 import io.github.spencerpark.ijava.JavaKernel;
 import io.github.spencerpark.ijava.execution.CodeEvaluator;
@@ -36,11 +37,13 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 public class MagicsTool {
     private static final String HIGHLIGHT_PATTERN = "\u001B[36m%s\u001B[0m";
 
@@ -106,6 +109,44 @@ public class MagicsTool {
             return null;
         }
         return String.join("\n", Files.readAllLines(Path.of(args.get(0))));
+    }
+
+    @LineMagic(value = "load")
+    public String loadFile(List<String> args) throws IOException {
+        if (args.isEmpty()) {
+            log.debug("%load called with no args");
+            return null;
+        }
+
+        String raw = args.get(0);
+        try {
+            Path p = Path.of(raw);
+            if (!Files.exists(p)) {
+                // try docs/notebooks relative path
+                Path alt = Path.of("docs", "notebooks").resolve(raw);
+                if (Files.exists(alt)) {
+                    p = alt;
+                } else {
+                    // try to find matching file in workspace
+                    try {
+                        Optional<Path> found = Files.walk(Path.of(".")).filter(f -> f.endsWith(raw)).findFirst();
+                        if (found.isPresent()) p = found.get();
+                    } catch (IOException e) {
+                        // ignore search errors
+                    }
+                }
+            }
+
+            if (!Files.exists(p)) {
+                log.warn("%load: file not found: {} (tried '{}')", raw, p);
+                return null;
+            }
+
+            return String.join("\n", Files.readAllLines(p));
+        } catch (Exception e) {
+            log.warn("%load: error loading '{}': {}", raw, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+            return null;
+        }
     }
 
     @LineMagic(value = "write")
