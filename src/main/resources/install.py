@@ -191,15 +191,14 @@ if __name__ == '__main__':
         )
         kernel_json_json_contents = json.loads(kernel_json_contents)
 
-        # If the distribution contains a jar in the installed 'java' folder,
+        # If the distribution contains a jar in the installed directory,
         # set argv[2] to that jar path so the kernelspec points at the real file.
         try:
-            java_dir = os.path.join(install_dest, 'java')
-            if os.path.isdir(java_dir):
-                # prefer any jar (first alphabetical) - this will be the renamed shadow jar
-                jars = sorted([f for f in os.listdir(java_dir) if f.endswith('.jar')])
+            if os.path.isdir(install_dest):
+                # prefer any jar (last alphabetically) - this will be the renamed shadow jar
+                jars = sorted([f for f in os.listdir(install_dest) if f.endswith('.jar')])
                 if jars:
-                    jar_path = os.path.join(install_dest, 'java', jars[-1])
+                    jar_path = os.path.join(install_dest, jars[-1])
                     argv = kernel_json_json_contents.get('argv')
                     if isinstance(argv, list) and len(argv) > 2:
                         argv[2] = jar_path

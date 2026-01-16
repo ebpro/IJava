@@ -4,5 +4,6 @@
 package io.github.spencerpark.ijava.magics;
 
 public class DBMSMagicsIntegrationTest {
-    // placeholder: tests run from notebooks using %maven to load H2 and other dependencies
+    // placeholder: tests run from notebooks using %maven to load H2 and other
+    // dependencies
 }

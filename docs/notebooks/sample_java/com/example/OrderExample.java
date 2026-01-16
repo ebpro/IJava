@@ -13,7 +13,15 @@ public class OrderExample {
         }
     }
 
+    public OrderExample() {
+    }
+
     public static String summary(Product p) {
         return p.id + ":" + p.name + ":" + p.price;
+    }
+
+    @Deprecated
+    public static String deprecatedMethod() {
+        return "This method is deprecated";
     }
 }

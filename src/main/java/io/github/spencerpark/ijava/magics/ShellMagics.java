@@ -29,7 +29,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.function.Consumer;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import io.github.spencerpark.jupyter.kernel.magic.registry.CellMagic;
 import lombok.extern.slf4j.Slf4j;
 
@@ -54,7 +56,58 @@ public class ShellMagics {
 
     @CellMagic("shell")
     public void shell(List<String> args, String body) throws InterruptedException, IOException {
-        String[] commands = { "zsh", "-c", body };
+        Map<String, String> opts = OptionUtils.parseOptions(args);
+
+        // Show help if requested
+        if (opts.containsKey("--help") || opts.containsKey("-h")) {
+            System.out.println("""
+                    ## %%shell - Execute shell commands
+
+                    **Usage:** `%%shell [--shell=SHELL] [--timeout=SECONDS]`
+
+                    **Options:**
+                    - `--shell=SHELL` : Shell to use (default: zsh, or $SHELL environment variable)
+                    - `--timeout=SECONDS` : Maximum execution time in seconds (default: 180)
+                    - `--help, -h` : Show this help message
+
+                    **Examples:**
+                    ```
+                    %%shell
+                    ls -la
+                    ```
+
+                    ```
+                    %%shell --shell=bash
+                    echo "Using bash"
+                    ```
+
+                    ```
+                    %%shell --timeout=60
+                    long-running-command
+                    ```
+                    """);
+            return;
+        }
+
+        // Determine shell to use
+        String shell = opts.getOrDefault("--shell", System.getenv("SHELL"));
+        if (shell == null || shell.isEmpty()) {
+            shell = "zsh";
+        }
+
+        // Get timeout (default 3 minutes)
+        long timeout = 180;
+        if (opts.containsKey("--timeout")) {
+            try {
+                timeout = Long.parseLong(opts.get("--timeout"));
+            } catch (NumberFormatException e) {
+                log.warn("Invalid timeout value, using default: 180 seconds");
+            }
+        }
+
+        log.debug("Running shell command with {}: {}", shell, body);
+
+        String[] commands = { shell, "-c", body };
         Process process;
         try {
             process = new ProcessBuilder()
@@ -63,13 +116,34 @@ public class ShellMagics {
             StreamGobbler streamGobblerErr = new StreamGobbler(process.getErrorStream(), System.err::println);
             Executors.newSingleThreadExecutor().submit(streamGobbler);
             Executors.newSingleThreadExecutor().submit(streamGobblerErr);
-            process.waitFor();
+
+            boolean finished = process.waitFor(timeout, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new RuntimeException("Command timed out after " + timeout + " seconds");
+            }
         } catch (IOException e) {
             log.error("Error while running shell command", e);
-            throw e;       
+            throw e;
         } catch (InterruptedException e) {
             log.error("Error while waiting for process to finish", e);
             throw e;
         }
+    }
+
+    @CellMagic("myshell")
+    @Deprecated(forRemoval = true)
+    public void myshell(List<String> args, String body) throws InterruptedException, IOException {
+        System.err.println(
+                "⚠️  WARNING: %%myshell is deprecated and will be removed in a future version. Use %%shell instead.");
+        shell(args, body);
+    }
+
+    @CellMagic("commonshell")
+    @Deprecated(forRemoval = true)
+    public void commonshell(List<String> args, String body) throws InterruptedException, IOException {
+        System.err.println(
+                "⚠️  WARNING: %%commonshell is deprecated and will be removed in a future version. Use %%shell instead.");
+        shell(args, body);
     }
 }

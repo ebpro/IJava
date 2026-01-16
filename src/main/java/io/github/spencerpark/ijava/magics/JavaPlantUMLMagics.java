@@ -28,9 +28,13 @@ public class JavaPlantUMLMagics {
      */
     @CellMagic("plantUML")
     public void plantUML(List<String> args, String body) throws IOException {
-        // args may include a format (SVG/PNG) and/or a flag to show source for debugging.
-        boolean showSource = args.stream().anyMatch(a -> a.equalsIgnoreCase("showSource") || a.equalsIgnoreCase("show-source") || a.equals("--show-source") || a.equals("-s") || a.equalsIgnoreCase("source"));
-        String fileFormat = args.stream().filter(a -> a.equalsIgnoreCase("SVG") || a.equalsIgnoreCase("PNG")).findFirst().orElse("SVG");
+        // args may include a format (SVG/PNG) and/or a flag to show source for
+        // debugging.
+        boolean showSource = args.stream()
+                .anyMatch(a -> a.equalsIgnoreCase("showSource") || a.equalsIgnoreCase("show-source")
+                        || a.equals("--show-source") || a.equals("-s") || a.equalsIgnoreCase("source"));
+        String fileFormat = args.stream().filter(a -> a.equalsIgnoreCase("SVG") || a.equalsIgnoreCase("PNG"))
+                .findFirst().orElse("SVG");
 
         SourceStringReader reader = new SourceStringReader(body);
         final ByteArrayOutputStream os = new ByteArrayOutputStream();
@@ -46,7 +50,8 @@ public class JavaPlantUMLMagics {
         if (fileFormat.equals("SVG")) {
             String svg = new String(os.toByteArray(), StandardCharsets.UTF_8);
             int idx = svg.indexOf("<svg");
-            if (idx > 0) svg = svg.substring(idx);
+            if (idx > 0)
+                svg = svg.substring(idx);
             out = svg;
         } else {
             out = ImageIO.read(new ByteArrayInputStream(os.toByteArray()));
@@ -78,7 +83,8 @@ public class JavaPlantUMLMagics {
         body.lines().forEach(filename -> {
             try {
                 Object out = cellMagic("plantUML", args, Files.readString(Paths.get(filename)));
-                // The invoked cell magic may perform its own display and return null; only display non-null results.
+                // The invoked cell magic may perform its own display and return null; only
+                // display non-null results.
                 if (out != null) {
                     outList.add(out);
                     display(out, fileFormat.equals("SVG") ? "image/svg+xml" : "image/png");
@@ -89,10 +95,12 @@ public class JavaPlantUMLMagics {
             } catch (RuntimeException e) {
                 // Bubble up with context to help debugging
                 log.error("Error running plantUML magic for file {}", filename, e);
-                throw new RuntimeException("Error running plantUML magic for file " + filename + ": " + e.getMessage(), e);
+                throw new RuntimeException("Error running plantUML magic for file " + filename + ": " + e.getMessage(),
+                        e);
             }
         });
-        // if caller expects a combined representation, nothing to return here; outputs have been displayed
+        // if caller expects a combined representation, nothing to return here; outputs
+        // have been displayed
 
     }
 

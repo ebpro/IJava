@@ -46,7 +46,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class MavenResolver {
-    private static final String DEFAULT_REPO_LOCAL = String.format("%s/.m2/repository", System.getProperty("user.home"));
+    private static final String DEFAULT_REPO_LOCAL = String.format("%s/.m2/repository",
+            System.getProperty("user.home"));
     private static final String DEFAULT_REPO_TYPE = "default";
 
     private final Consumer<String> addToClasspath;
@@ -69,7 +70,7 @@ public class MavenResolver {
         jars.forEach(this.addToClasspath);
     }
 
-    @LineMagic(aliases = {"addMavenDependency", "maven"})
+    @LineMagic(aliases = { "addMavenDependency", "maven" })
     public void addMavenDependencies(List<String> args) {
         try {
             this.addJarsToClasspath(ResolveDependency.resolve(args, null, DEFAULT_REPO_LOCAL, remoteRepos));
@@ -78,7 +79,7 @@ public class MavenResolver {
         }
     }
 
-    @LineMagic(aliases = {"mavenRepo"})
+    @LineMagic(aliases = { "mavenRepo" })
     public void addMavenRepo(List<String> args) {
         MagicsArgs schema = MagicsArgs.builder().required("id").required("url").build();
         Map<String, List<String>> argData = schema.parse(args);
@@ -88,8 +89,12 @@ public class MavenResolver {
         this.addRemoteRepo(id, url);
     }
 
-    @CellMagic(aliases = {"pom"})
+    @CellMagic(aliases = { "pom" })
+    @Deprecated(forRemoval = true)
     public void loadFromPOM(List<String> args, String body) throws Exception {
+        System.err.println("⚠️  WARNING: Cell magic %%pom is deprecated and will be removed in a future version.");
+        System.err.println(
+                "          Use line magic %pom with a file path instead, or use %addMavenDependencies for inline dependencies.");
         try {
             Matcher reposMatcher = reposPattern.matcher(body);
             String repos = reposMatcher.find() ? reposMatcher.group("repos") : "";
@@ -104,24 +109,58 @@ public class MavenResolver {
         }
     }
 
-    @LineMagic(aliases = {"pom"})
+    @LineMagic(aliases = { "pom" })
     public void loadFromPOM(List<String> args) {
         if (args.isEmpty())
             throw new IllegalArgumentException("Loading from POM requires at least the path to the POM file");
 
         MagicsArgs schema = MagicsArgs.builder()
                 .required("pomPath")
+                .flag("help", 'h', "Show help")
                 .onlyKnownKeywords().onlyKnownFlags().build();
 
         Map<String, List<String>> argMap = schema.parse(args);
+
+        // Show help if requested
+        if (argMap.containsKey("help")) {
+            System.out.println("""
+                    ## %pom - Load dependencies from a Maven POM file
+
+                    **Usage:** `%pom [--help] path/to/pom.xml`
+
+                    **Arguments:**
+                    - `pomPath` : Path to the POM file (required)
+
+                    **Options:**
+                    - `--help, -h` : Show this help message
+
+                    **Description:**
+                    Parses a Maven POM file and adds all dependencies to the notebook classpath.
+                    Also registers any repositories defined in the POM.
+
+                    **Examples:**
+                    ```
+                    %pom pom.xml
+                    ```
+
+                    ```
+                    %pom ../my-project/pom.xml
+                    ```
+
+                    **See also:**
+                    - `%addMavenDependencies` / `%maven` - Add individual Maven coordinates
+                    - `%mavenRepo` - Add a Maven repository
+                    """);
+            return;
+        }
 
         String pomPath = argMap.get("pomPath").get(0);
         try {
             MavenXpp3Reader reader = new MavenXpp3Reader();
             Model model = reader.read(new FileReader(pomPath, StandardCharsets.UTF_8));
             resolveModel(model);
-        } catch (IOException | XmlPullParserException | DependencyResolutionException |
-                 NoLocalRepositoryManagerException e) {
+        } catch (IOException | XmlPullParserException | DependencyResolutionException
+                | NoLocalRepositoryManagerException e) {
             throw new RuntimeException(e);
         }
     }

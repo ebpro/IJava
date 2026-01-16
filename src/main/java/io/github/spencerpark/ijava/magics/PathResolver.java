@@ -9,12 +9,15 @@ import java.util.List;
 import java.util.Optional;
 
 public final class PathResolver {
-    private PathResolver() {}
+    private PathResolver() {
+    }
 
-    public static Optional<Path> resolveSourceFileForClass(String fullyQualifiedClassName, java.util.Map<String, String> opts) {
+    public static Optional<Path> resolveSourceFileForClass(String fullyQualifiedClassName,
+            java.util.Map<String, String> opts) {
         String srcBase = opts.getOrDefault("src", null);
         List<String> bases = new ArrayList<>();
-        if (srcBase != null && !srcBase.isBlank()) bases.add(srcBase);
+        if (srcBase != null && !srcBase.isBlank())
+            bases.add(srcBase);
         bases.add("src/main/java");
         bases.add("src");
         bases.add("docs/notebooks/sample_java");
@@ -25,16 +28,21 @@ public final class PathResolver {
 
         for (String base : bases) {
             Path p = Paths.get(base).resolve(rel);
-            if (Files.exists(p)) return Optional.of(p);
+            if (Files.exists(p))
+                return Optional.of(p);
             Path p2 = Paths.get(base).resolve("src/main/java").resolve(rel);
-            if (Files.exists(p2)) return Optional.of(p2);
+            if (Files.exists(p2))
+                return Optional.of(p2);
         }
 
         try {
             final String simple = className + ".java";
-            Optional<Path> found = Files.walk(Paths.get(".")).filter(Files::isRegularFile).filter(p -> p.getFileName().toString().equals(simple)).findFirst();
-            if (found.isPresent()) return found;
-        } catch (IOException ignored) {}
+            Optional<Path> found = Files.walk(Paths.get(".")).filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().equals(simple)).findFirst();
+            if (found.isPresent())
+                return found;
+        } catch (IOException ignored) {
+        }
 
         return Optional.empty();
     }

@@ -1,5 +1,5 @@
 # IJava Magics — Comprehensive Audit & UX Improvement Plan
-**Date:** January 15, 2026  
+**Date:** January 15, 2026
 **Status:** Post-initial-refactor assessment
 
 ---
@@ -440,6 +440,6 @@ This document provides a deep audit of all magics in `src/main/java/.../magics/`
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** January 15, 2026  
+**Document Version:** 1.0
+**Last Updated:** January 15, 2026
 **Author:** GitHub Copilot (audit commissioned by user `bruno`)

@@ -28,6 +28,7 @@ import io.github.spencerpark.jupyter.kernel.magic.LineMagicParseContext;
 import io.github.spencerpark.jupyter.kernel.magic.MagicParser;
 
 import java.util.Base64;
+import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -45,6 +46,31 @@ public class MagicsSourceTransformer {
         CellMagicParseContext ctx = this.parser.parseCellMagic(source);
         if (ctx != null)
             return this.transformCellMagic(ctx);
+
+        // Fallback: some frontends (or single-line cells) may present a cell magic
+        // with no body (e.g. "%%compile -h"). The parser may not treat this as
+        // a cell magic. If the source starts with "%%" and no ctx was parsed,
+        // synthesize a cell-magic transform so magics can short-circuit help
+        // handling without requiring a non-empty body.
+        String trimmed = source == null ? "" : source.trim();
+        if (trimmed.startsWith("%%")) {
+            String header = trimmed.substring(2).trim();
+            String[] parts = header.split("\\s+", 2);
+            String name = parts.length > 0 ? parts[0] : "";
+            String argsPart = parts.length > 1 ? parts[1] : "";
+            String argsList = "";
+            if (!argsPart.isBlank()) {
+                argsList = Arrays.stream(argsPart.split("\\s+"))
+                        .map(this::b64Transform)
+                        .collect(Collectors.joining(","));
+            }
+
+            return String.format(
+                    "cellMagic(%s,List.of(%s),%s);{};",
+                    this.b64Transform(name),
+                    argsList,
+                    this.b64Transform(""));
+        }
 
         return transformLineMagics(source);
     }
@@ -77,8 +103,7 @@ public class MagicsSourceTransformer {
                 this.b64Transform(ctx.getMagicCall().getName()),
                 ctx.getMagicCall().getArgs().stream()
                         .map(this::b64Transform)
-                        .collect(Collectors.joining(","))
-        );
+                        .collect(Collectors.joining(",")));
     }
 
     private String transformCellMagic(CellMagicParseContext ctx) {
@@ -88,7 +113,6 @@ public class MagicsSourceTransformer {
                 ctx.getMagicCall().getArgs().stream()
                         .map(this::b64Transform)
                         .collect(Collectors.joining(",")),
-                this.b64Transform(ctx.getMagicCall().getBody())
-        );
+                this.b64Transform(ctx.getMagicCall().getBody()));
     }
 }

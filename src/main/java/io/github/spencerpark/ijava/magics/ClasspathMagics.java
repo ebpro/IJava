@@ -26,7 +26,10 @@ package io.github.spencerpark.ijava.magics;
 import io.github.spencerpark.jupyter.kernel.magic.registry.LineMagic;
 import io.github.spencerpark.jupyter.kernel.util.GlobFinder;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.StreamSupport;
@@ -74,5 +77,26 @@ public class ClasspathMagics {
         paths.forEach(this.addToClasspath);
 
         return paths;
+    }
+
+    @LineMagic(value = "classpath-snapshot")
+    public String classpathSnapshot(List<String> args) {
+        String cp = System.getProperty("java.class.path");
+        String[] parts = cp.split(File.pathSeparator);
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            sb.append(p);
+            try {
+                Path path = Path.of(p);
+                if (Files.exists(path)) {
+                    sb.append(" (lastModified=").append(Files.getLastModifiedTime(path)).append(")");
+                }
+            } catch (Exception ignored) {
+            }
+            sb.append("\n");
+        }
+        String out = sb.toString();
+        System.out.println(out);
+        return out;
     }
 }

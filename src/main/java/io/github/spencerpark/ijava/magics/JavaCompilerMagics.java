@@ -172,25 +172,66 @@ public class JavaCompilerMagics {
     }
 
     private boolean hasValidFlag(Map<String, List<String>> vals, String key) {
-        return vals.containsKey(key) && 
-               !vals.get(key).isEmpty() && 
-               !vals.get(key).get(0).isEmpty();
+        return vals.containsKey(key) &&
+                !vals.get(key).isEmpty() &&
+                !vals.get(key).get(0).isEmpty();
     }
 
     @CellMagic("compile")
     public void compile(List<String> args, String body) throws IOException {
+        // If user asked for help, short-circuit before any argument parsing that
+        // requires
+        // required positional parameters (like className).
+        if (args.contains("--help") || args.contains("-h")) {
+            System.out.println("""
+                    ## %%compile - Compile Java source code and add to classpath
+
+                    **Usage:** `%%compile [--verbose] [--debug] [--nowarn] fully.qualified.ClassName`
+
+                    **Arguments:**
+                    - `className` : Fully qualified class name (e.g., com.example.MyClass)
+
+                    **Options:**
+                    - `--verbose, -v` : Enable verbose compilation output
+                    - `--debug, -d` : Include debug information in compiled classes
+                    - `--nowarn, -w` : Suppress compiler warnings
+                    - `--help, -h` : Show this help message
+
+                    **Examples:**
+                    ```
+                    %%compile com.example.Calculator
+                    public class Calculator {
+                        public int add(int a, int b) { return a + b; }
+                    }
+                    ```
+
+                    ```
+                    %%compile --verbose --debug com.example.MyClass
+                    public class MyClass {
+                        public void hello() { System.out.println("Hello!"); }
+                    }
+                    ```
+
+                    **Note:** Package declaration will be added automatically if not present.
+                    """);
+            return;
+        }
+
         MagicsArgs schema = MagicsArgs.builder()
                 .required("className")
                 .flag("verbose", 'v', "Enable verbose output")
                 .flag("debug", 'd', "Add debug information")
+                .flag("dry-run", 'n', "Show what would be compiled without invoking javac")
                 .flag("nowarn", 'w', "Suppress warnings")
                 .onlyKnownKeywords()
                 .onlyKnownFlags()
                 .build();
         Map<String, List<String>> vals = schema.parse(args);
+
         boolean verbose = hasValidFlag(vals, "verbose");
         boolean debug = hasValidFlag(vals, "debug");
         boolean nowarn = hasValidFlag(vals, "nowarn");
+        boolean dryRun = hasValidFlag(vals, "dry-run");
         String className = vals.get("className").get(0);
 
         if (verbose) {
@@ -211,6 +252,15 @@ public class JavaCompilerMagics {
             Path sourceFile = prepareSourceFile(className, body);
             if (verbose) {
                 log.info("Source file prepared at: {}", sourceFile);
+            }
+
+            // If dry-run, report files and options
+            if (dryRun) {
+                Path sourceFilePreview = prepareSourceFile(className, body);
+                List<String> optsList = buildCompilerOptions(context.outputRoot, debug, nowarn);
+                System.out.println("Dry run: would compile source file: " + sourceFilePreview);
+                System.out.println("With javac options: " + String.join(" ", optsList));
+                return;
             }
 
             // Compile
@@ -234,5 +284,13 @@ public class JavaCompilerMagics {
                 log.info("Successfully compiled {} and added to classpath", className);
             }
         }
+    }
+
+    @CellMagic("mycompile")
+    @Deprecated(forRemoval = true)
+    public void mycompile(List<String> args, String body) throws IOException {
+        System.err.println(
+                "⚠️  WARNING: %%mycompile is deprecated and will be removed in a future version. Use %%compile instead.");
+        compile(args, body);
     }
 }

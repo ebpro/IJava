@@ -3,12 +3,18 @@ package io.github.spencerpark.ijava.magics;
 import java.util.*;
 
 public final class OptionUtils {
-    private OptionUtils() {}
+    private OptionUtils() {
+    }
 
     public static Map<String, String> parseOptions(List<String> args) {
         Map<String, String> opts = new HashMap<>();
         for (int i = 0; i < args.size(); i++) {
             String a = args.get(i);
+            if (a.equals("--help") || a.equals("-h")) {
+                opts.put("--help", "");
+                opts.put("-h", "");
+                continue;
+            }
             if (a.equals("--raw")) {
                 opts.put("format", "raw");
             } else if (a.equals("--fenced")) {
@@ -35,7 +41,8 @@ public final class OptionUtils {
 
     public static List<String> positionalArgs(List<String> args) {
         return args.stream()
-                .filter(a -> !a.equals("--raw") && !a.equals("--fenced") && !a.startsWith("--src") && !a.startsWith("--root") && !a.contains("="))
+                .filter(a -> !a.equals("--raw") && !a.equals("--fenced") && !a.startsWith("--src")
+                        && !a.startsWith("--root") && !a.contains("="))
                 .toList();
     }
 }

@@ -4,7 +4,8 @@ import java.util.Map;
 import static io.github.spencerpark.ijava.runtime.Display.display;
 
 public final class OutputUtils {
-    private OutputUtils() {}
+    private OutputUtils() {
+    }
 
     public static void formatAndDisplay(String content, Map<String, String> opts) {
         boolean raw = opts.getOrDefault("format", "fenced").equals("raw");
