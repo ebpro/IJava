@@ -140,22 +140,59 @@ jobs:
           }
           trap cleanup EXIT
 
-          python3 -c 'import json, random; ports = [random.randint(15000, 30000) for _ in range(5)]; keys = ["shell_port","iopub_port","stdin_port","control_port","hb_port"]; d = dict(zip(keys, ports)); d.update({"ip": "127.0.0.1", "transport": "tcp", "signature_scheme": "hmac-sha256", "key": ""}); print(json.dumps(d))' > "$CONN"
+          # create a minimal isolated venv under smoke/ and run a notebook against the unpacked jar
+          CONN=$(mktemp --suffix=.json)
           echo "Connection file: $CONN"
 
-          java -jar "$JAR" "$CONN" >/dev/null 2>&1 &
-          KPID=$!
-          echo "Kernel PID: $KPID"
-          sleep 5
-          if kill -0 "$KPID" >/dev/null 2>&1; then
-            echo "Kernel started (PID $KPID) - killing"
-            kill "$KPID" || true
-            wait "$KPID" || true
-          else
-            echo "Kernel process exited prematurely" >&2
-            ps aux | head -n 20 || true
-            exit 1
-          fi
+          # create venv inside smoke so cleanup removes it
+          python3 -m venv smoke/venv
+          . smoke/venv/bin/activate
+          pip install --upgrade pip
+          pip install --no-cache-dir jupyter nbconvert jupyter-client >/dev/null
+
+          # prepare a kernelspec that launches the unpacked jar
+          JAR_ABS=$(realpath "$JAR")
+          KS_DIR=$(mktemp -d)
+          mkdir -p "$KS_DIR/ijavatest"
+          cat > "$KS_DIR/ijavatest/kernel.json" <<'EOF'
+{
+  "argv": ["java","-jar","__JAR_PATH__","{connection_file}"],
+  "display_name": "IJava-SmokeTest",
+  "language": "java"
+}
+EOF
+          sed -i "s|__JAR_PATH__|${JAR_ABS}|g" "$KS_DIR/ijavatest/kernel.json"
+
+          # install kernelspec into the venv (sys-prefix keeps it inside venv)
+          jupyter kernelspec install --sys-prefix "$KS_DIR/ijavatest" --name ijavatest --replace
+
+          # create a minimal notebook that exercises the kernel
+          cat > smoke/hello.ipynb <<'JSON'
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "System.out.println(\"hello from ijava smoke test\");"
+   ]
+  }
+ ],
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {}
+}
+JSON
+
+          # execute the notebook using the temporary kernel; fail on any error
+          jupyter nbconvert --to notebook --execute smoke/hello.ipynb \
+            --ExecutePreprocessor.timeout=60 \
+            --ExecutePreprocessor.kernel_name=ijavatest \
+            --output smoke/executed.ipynb
+
+          # deactivate venv; smoke/ will be removed by the existing cleanup trap
+          deactivate || true
 
   publish:
     name: Create Release
