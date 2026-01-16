@@ -149,14 +149,14 @@ jobs:
         with:
           name: distribution
 
-        - name: Create GitHub Release and upload assets
-          uses: softprops/action-gh-release@v1
-          with:
-            body_path: UPGRADE.md
-            files: |
-              IJava-${{ github.ref_name }}.zip
-              IJava-${{ github.ref_name }}.zip.sha256
-            prerelease: ${{ github.event_name == 'workflow_dispatch' ? (github.event.inputs.prerelease == 'true') : (contains(github.ref, '-pr') || contains(github.ref, '-rc')) }}
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.build.outputs.tag }}
+          body_path: UPGRADE.md
+          files: |
+            IJava-${{ needs.build.outputs.tag }}.zip
+            IJava-${{ needs.build.outputs.tag }}.zip.sha256
+          prerelease: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease == 'true') || (github.event_name != 'workflow_dispatch' && (contains(github.ref, '-pr') || contains(github.ref, '-rc'))) }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
