@@ -106,7 +106,7 @@ tasks.register('packDist', Zip) {
     description = 'Creates distribution package'
     group = 'distribution'
 
-    archiveFileName = "${project.name}-latest.zip"
+    archiveFileName = "${project.name}-${project.version}.zip"
 
     from(layout.buildDirectory.dir("resources/main")) {
         include "install.py"
