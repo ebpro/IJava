@@ -94,6 +94,12 @@ jobs:
         with:
           name: distribution
 
+      - name: Set up JDK 21 for smoke-test
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
       - name: Run smoke test
         run: |
           set -euo pipefail
@@ -109,7 +115,7 @@ jobs:
           # Simplified kernel install
           mkdir -p kernel_meta
           echo "{\"argv\":[\"java\",\"-jar\",\"$(realpath $JAR)\",\"{connection_file}\"],\"display_name\":\"Java\",\"language\":\"java\"}" > kernel_meta/kernel.json
-          ./venv/bin/jupyter kernelspec install --user --name ijavatest --replace ./kernel_meta
+          ./venv/bin/jupyter kernelspec install --sys-prefix --name ijavatest --replace ./kernel_meta
 
           # Create and execute test notebook
           echo '{"cells":[{"cell_type":"code","execution_count":null,"metadata":{},"outputs":[],"source":["System.out.println(\"Hello\");"]}],"metadata":{},"nbformat":4,"nbformat_minor":4}' > test.ipynb
