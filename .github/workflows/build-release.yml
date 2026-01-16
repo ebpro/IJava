@@ -120,7 +120,7 @@ jobs:
             exit 1
           fi
           echo "Found jar: $JAR"
-          
+
           CONN=$(mktemp --suffix=.json)
           python3 -c 'import json, random; ports = [random.randint(15000, 30000) for _ in range(5)]; keys = ["shell_port","iopub_port","stdin_port","control_port","hb_port"]; d = dict(zip(keys, ports)); d.update({"ip": "127.0.0.1", "transport": "tcp", "signature_scheme": "hmac-sha256", "key": ""}); print(json.dumps(d))' > "$CONN"
           echo "Connection file: $CONN"
