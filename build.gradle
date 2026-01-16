@@ -5,7 +5,8 @@ plugins {
 }
 
 group = 'io.github.spencerpark'
-version = '1.4.5'
+// Allow overriding version from command line via `-Pversion=...`
+version = (project.findProperty('version') ?: '1.4.5').toString()
 
 // Java configuration
 java {
