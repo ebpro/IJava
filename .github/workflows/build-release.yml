@@ -48,17 +48,17 @@ jobs:
       - name: Determine tag
         id: set-tag
         run: |
-          set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ -n "${{ github.event.inputs.tag || '' }}" ]; then
-              echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+            if [ -n "${{ github.event.inputs.tag }}" ]; then
+              TAG_NAME="${{ github.event.inputs.tag }}"
             else
-              VER=$(./gradlew -q properties --no-daemon | sed -n 's/^version: //p')
-              echo "tag=${VER}" >> $GITHUB_OUTPUT
+              # Fallback to gradle version if no input provided
+              TAG_NAME=$(./gradlew -q properties | grep ^version: | awk '{print $2}')
             fi
           else
-            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
           fi
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
 
       - name: Build package
         run: |
@@ -69,31 +69,24 @@ jobs:
         run: |
           set -euo pipefail
           TAG=${{ steps.set-tag.outputs.tag }}
-          ARTIFACT="build/distributions/IJava-${TAG}.zip"
-          if [ ! -f "$ARTIFACT" ]; then
-            ARTIFACT=$(ls build/distributions/*.zip | head -n1 || true)
-            if [ -z "$ARTIFACT" ]; then
-              echo "No distribution zip found in build/distributions" >&2
-              ls -la build || true
-              exit 1
-            fi
-          fi
-          sha256sum "$ARTIFACT" > "${ARTIFACT}.sha256"
-          echo "Prepared $ARTIFACT and checksum"
-          ls -l "$ARTIFACT" "${ARTIFACT}.sha256"
+          # Look for the zip regardless of name, then rename it to a standard format for the artifact
+          RAW_ZIP=$(ls build/distributions/*.zip | head -n1)
+          cp "$RAW_ZIP" "IJava-${TAG}.zip"
+          sha256sum "IJava-${TAG}.zip" > "IJava-${TAG}.zip.sha256"
 
       - name: Upload distribution artifact
         uses: actions/upload-artifact@v4
         with:
           name: distribution
           path: |
-            build/distributions/IJava-${{ steps.set-tag.outputs.tag }}.zip
-            build/distributions/IJava-${{ steps.set-tag.outputs.tag }}.zip.sha256
+            IJava-${{ steps.set-tag.outputs.tag }}.zip
+            IJava-${{ steps.set-tag.outputs.tag }}.zip.sha256
 
   smoke-test:
     name: Smoke-test distribution
     needs: build
     runs-on: ubuntu-latest
+    # Run if manual dispatch asks for it OR if it's a tag push
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.run_smoke_test == 'true' }}
     steps:
       - name: Download distribution
@@ -101,118 +94,49 @@ jobs:
         with:
           name: distribution
 
-      - name: Run smoke test (unpack & start briefly)
+      - name: Run smoke test
         run: |
           set -euo pipefail
-          # prepare workspace
-          DIST=$(ls -1 *.zip | grep IJava || true)
-          if [ -z "$DIST" ]; then
-            echo "Distribution zip not found in artifact" >&2
-            ls -la || true
-            exit 1
-          fi
-          echo "Using distribution: $DIST"
-          rm -rf smoke && mkdir -p smoke
+          DIST=$(ls IJava-*.zip | head -n1)
           unzip -q "$DIST" -d smoke
 
-          # locate jar
-          JAR=$(find smoke -type f -name "*-all.jar" -print -quit)
-          if [ -z "$JAR" ]; then
-            JAR=$(find smoke -type f -name "*.jar" -print -quit)
-          fi
-          if [ -z "$JAR" ]; then
-            echo "No jar found inside distribution" >&2
-            ls -R smoke || true
-            exit 1
-          fi
-          echo "Found jar: $JAR"
+          # Find the JAR (supporting both flat and nested structures)
+          JAR=$(find smoke -name "*.jar" | head -n1)
 
-          # create connection file and ensure cleanup on exit
-          CONN=$(mktemp --suffix=.json)
-          KPID=""
-          cleanup() {
-            if [ -n "${KPID:-}" ]; then
-              kill "$KPID" 2>/dev/null || true
-              wait "$KPID" 2>/dev/null || true
-            fi
-            rm -f "${CONN:-}" || true
-            rm -rf smoke || true
-          }
-          trap cleanup EXIT
+          python3 -m venv venv
+          ./venv/bin/pip install jupyter nbconvert jupyter-client
 
-          # create a minimal isolated venv under smoke/ and run a notebook against the unpacked jar
-          CONN=$(mktemp --suffix=.json)
-          echo "Connection file: $CONN"
+          # Simplified kernel install
+          mkdir -p kernel_meta
+          echo "{\"argv\":[\"java\",\"-jar\",\"$(realpath $JAR)\",\"{connection_file}\"],\"display_name\":\"Java\",\"language\":\"java\"}" > kernel_meta/kernel.json
+          ./venv/bin/jupyter kernelspec install --user --name ijavatest --replace ./kernel_meta
 
-          # create venv inside smoke so cleanup removes it
-          python3 -m venv smoke/venv
-          . smoke/venv/bin/activate
-          pip install --upgrade pip
-          pip install --no-cache-dir jupyter nbconvert jupyter-client >/dev/null
-
-          # prepare a kernelspec that launches the unpacked jar
-          JAR_ABS=$(realpath "$JAR")
-          KS_DIR=$(mktemp -d)
-          mkdir -p "$KS_DIR/ijavatest"
-          cat > "$KS_DIR/ijavatest/kernel.json" <<'EOF'
-{
-  "argv": ["java","-jar","__JAR_PATH__","{connection_file}"],
-  "display_name": "IJava-SmokeTest",
-  "language": "java"
-}
-EOF
-          sed -i "s|__JAR_PATH__|${JAR_ABS}|g" "$KS_DIR/ijavatest/kernel.json"
-
-          # install kernelspec into the venv (sys-prefix keeps it inside venv)
-          jupyter kernelspec install --sys-prefix "$KS_DIR/ijavatest" --name ijavatest --replace
-
-          # create a minimal notebook that exercises the kernel
-          cat > smoke/hello.ipynb <<'JSON'
-{
- "cells": [
-  {
-   "cell_type": "code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "System.out.println(\"hello from ijava smoke test\");"
-   ]
-  }
- ],
- "nbformat": 4,
- "nbformat_minor": 2,
- "metadata": {}
-}
-JSON
-
-          # execute the notebook using the temporary kernel; fail on any error
-          jupyter nbconvert --to notebook --execute smoke/hello.ipynb \
-            --ExecutePreprocessor.timeout=60 \
-            --ExecutePreprocessor.kernel_name=ijavatest \
-            --output smoke/executed.ipynb
-
-          # deactivate venv; smoke/ will be removed by the existing cleanup trap
-          deactivate || true
+          # Create and execute test notebook
+          echo '{"cells":[{"cell_type":"code","execution_count":null,"metadata":{},"outputs":[],"source":["System.out.println(\"Hello\");"]}],"metadata":{},"nbformat":4,"nbformat_minor":4}' > test.ipynb
+          ./venv/bin/jupyter nbconvert --to notebook --execute test.ipynb --ExecutePreprocessor.kernel_name=ijavatest
 
   publish:
     name: Create Release
     needs: [build, smoke-test]
-    runs-on: [self-hosted, Linux, X64]
-    if: ${{ startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true') }}
+    runs-on: ubuntu-latest # No need for self-hosted here usually, ubuntu-latest is safer for API calls
+    if: ${{ always() && (needs.smoke-test.result == 'success' || needs.smoke-test.result == 'skipped') && (startsWith(github.ref, 'refs/tags/') || github.event.inputs.publish == 'true') }}
     steps:
+      - name: Checkout code (for UPGRADE.md)
+        uses: actions/checkout@v4
+
       - name: Download distribution
         uses: actions/download-artifact@v4
         with:
           name: distribution
 
-      - name: Create GitHub Release and upload assets
-        uses: softprops/action-gh-release@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2 # Updated to v2
         with:
           tag_name: ${{ needs.build.outputs.tag }}
           body_path: UPGRADE.md
           files: |
             IJava-${{ needs.build.outputs.tag }}.zip
             IJava-${{ needs.build.outputs.tag }}.zip.sha256
-          prerelease: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease == 'true') || (github.event_name != 'workflow_dispatch' && (contains(github.ref, '-pr') || contains(github.ref, '-rc'))) }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(github.ref, '-rc') || contains(github.ref, '-pr') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
