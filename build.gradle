@@ -58,6 +58,7 @@ dependencies {
 
     implementation "ch.qos.logback:logback-classic:${versions.logback}"
     testImplementation "junit:junit:${versions.junit}"
+    testImplementation 'com.h2database:h2:2.2.220'
 
     // JavaParser for Java source code analysis
     implementation 'com.github.javaparser:javaparser-core:3.25.8'

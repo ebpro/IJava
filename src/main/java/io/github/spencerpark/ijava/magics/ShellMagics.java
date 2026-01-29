@@ -31,12 +31,37 @@ import java.util.function.Consumer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import io.github.spencerpark.jupyter.kernel.magic.registry.CellMagic;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class ShellMagics {
+
+    private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool();
+
+    /**
+     * Gracefully shutdown the shared executor service used for stream gobbling.
+     * Safe to call multiple times.
+     */
+    public static void shutdownExecutor() {
+        EXECUTOR.shutdown();
+        try {
+            EXECUTOR.awaitTermination(1, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Return whether the shared executor has been shutdown.
+     */
+    public static boolean isExecutorShutdown() {
+        return EXECUTOR.isShutdown();
+    }
 
     private static class StreamGobbler implements Runnable {
         private InputStream inputStream;
@@ -114,13 +139,20 @@ public class ShellMagics {
                     .command(commands).start();
             StreamGobbler streamGobbler = new StreamGobbler(process.getInputStream(), System.out::println);
             StreamGobbler streamGobblerErr = new StreamGobbler(process.getErrorStream(), System.err::println);
-            Executors.newSingleThreadExecutor().submit(streamGobbler);
-            Executors.newSingleThreadExecutor().submit(streamGobblerErr);
+            Future<?> fOut = EXECUTOR.submit(streamGobbler);
+            Future<?> fErr = EXECUTOR.submit(streamGobblerErr);
 
             boolean finished = process.waitFor(timeout, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
                 throw new RuntimeException("Command timed out after " + timeout + " seconds");
+            }
+            // Wait briefly for gobblers to flush remaining output
+            try {
+                fOut.get(1, TimeUnit.SECONDS);
+                fErr.get(1, TimeUnit.SECONDS);
+            } catch (ExecutionException | java.util.concurrent.TimeoutException e) {
+                // ignore - best-effort
             }
         } catch (IOException e) {
             log.error("Error while running shell command", e);
@@ -131,19 +163,5 @@ public class ShellMagics {
         }
     }
 
-    @CellMagic("myshell")
-    @Deprecated(forRemoval = true)
-    public void myshell(List<String> args, String body) throws InterruptedException, IOException {
-        System.err.println(
-                "⚠️  WARNING: %%myshell is deprecated and will be removed in a future version. Use %%shell instead.");
-        shell(args, body);
-    }
-
-    @CellMagic("commonshell")
-    @Deprecated(forRemoval = true)
-    public void commonshell(List<String> args, String body) throws InterruptedException, IOException {
-        System.err.println(
-                "⚠️  WARNING: %%commonshell is deprecated and will be removed in a future version. Use %%shell instead.");
-        shell(args, body);
-    }
+    // Deprecated wrappers removed: use %%shell instead
 }

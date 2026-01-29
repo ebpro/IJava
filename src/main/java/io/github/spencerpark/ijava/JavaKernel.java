@@ -127,7 +127,7 @@ public class JavaKernel extends BaseKernel {
         magics.registerMagics(new JavaDBMSMagics());
         magics.registerMagics(new JavaMagics());
         magics.registerMagics(new JavaPlantUMLMagics());
-        magics.registerMagics(new MyShellMagics());
+        // Consolidated shell magics: `MyShellMagics` removed, use `ShellMagics` only.
         magics.registerMagics(new ShellMagics());
         try {
             magics.registerMagics(new SingleShellMagics());
@@ -420,6 +420,11 @@ public class JavaKernel extends BaseKernel {
     @Override
     public void onShutdown(boolean isRestarting) {
         this.evaluator.shutdown();
+        try {
+            io.github.spencerpark.ijava.magics.ShellMagics.shutdownExecutor();
+        } catch (Throwable t) {
+            log.warn("Failed to shutdown ShellMagics executor", t);
+        }
     }
 
     @Override
