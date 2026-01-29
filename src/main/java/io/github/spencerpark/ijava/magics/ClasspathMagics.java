@@ -43,6 +43,13 @@ public class ClasspathMagics {
 
     @LineMagic
     public List<String> jars(List<String> args) {
+        if (args == null) args = List.of();
+        if (args.contains("--help") || args.contains("-h")) {
+            System.out.println("## %jars - Add jar files to classpath\n\n" +
+                    "Usage: %jars [--help] <glob-pattern>...\n\n" +
+                    "Adds matching jar files to the kernel classpath and returns their paths.");
+            return List.of();
+        }
         List<String> jars = args.stream()
                 .map(GlobFinder::new)
                 .flatMap(g -> {
@@ -62,6 +69,11 @@ public class ClasspathMagics {
 
     @LineMagic
     public List<String> classpath(List<String> args) {
+        if (args == null) args = List.of();
+        if (args.contains("--help") || args.contains("-h")) {
+            System.out.println("## %classpath - Add paths to classpath\n\nUsage: %classpath [--help] <glob-pattern>...\n\nAdds matching paths to the kernel classpath and returns their paths.");
+            return List.of();
+        }
         List<String> paths = args.stream()
                 .map(GlobFinder::new)
                 .flatMap(g -> {
@@ -81,6 +93,11 @@ public class ClasspathMagics {
 
     @LineMagic(value = "classpath-snapshot")
     public String classpathSnapshot(List<String> args) {
+        if (args == null) args = List.of();
+        if (args.contains("--help") || args.contains("-h")) {
+            System.out.println("## %classpath-snapshot - Show current classpath\n\nUsage: %classpath-snapshot [--help]\n\nPrints the current java.class.path entries and returns them as a string.");
+            return "";
+        }
         String cp = System.getProperty("java.class.path");
         String[] parts = cp.split(File.pathSeparator);
         StringBuilder sb = new StringBuilder();

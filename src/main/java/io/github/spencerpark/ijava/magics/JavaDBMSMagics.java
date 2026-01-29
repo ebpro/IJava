@@ -167,6 +167,16 @@ public class JavaDBMSMagics {
      */
     @CellMagic("rdbmsSchema")
     public void rdbmsSchema(java.util.List<String> args, String body) {
+        if (args != null) {
+            for (String a : args) {
+                if (a != null && (a.equals("--help") || a.equals("-h"))) {
+                    System.out.println("## %%rdbmsSchema - Render DB schema as PlantUML\n\n" +
+                            "Usage: %%rdbmsSchema [--help] [<schema>] [SVG|PNG] [--show-source] [include=<regex>] [exclude=<regex>]\n\n" +
+                            "Provide table names in the cell body (one per line) to limit the diagram.");
+                    return;
+                }
+            }
+        }
         // args may contain: [<schema>] [SVG|PNG] [showSource|-s] [handwritten]
         // [include=<regex>] [exclude=<regex>] [scale=<n>]
         String schema = null;
@@ -253,7 +263,18 @@ public class JavaDBMSMagics {
                     // ignore common comment markers so comments aren't treated as table names
                     if (l.startsWith("//") || l.startsWith("#") || l.startsWith("--"))
                         continue;
-                    tableNames.add(l);
+                    // skip SQL statements (SELECT/CREATE/INSERT/UPDATE/DELETE/etc.) if the user
+                    // pasted SQL into the cell — rdbmsSchema expects table names, not queries.
+                    if (l.matches("(?i)^(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|WITH)\\b.*"))
+                        continue;
+                    // strip surrounding quotes and trailing semicolons
+                    if ((l.startsWith("\"") && l.endsWith("\"")) || (l.startsWith("'") && l.endsWith("'"))) {
+                        l = l.substring(1, l.length() - 1).trim();
+                    }
+                    if (l.endsWith(";"))
+                        l = l.substring(0, l.length() - 1).trim();
+                    if (!l.isEmpty())
+                        tableNames.add(l);
                 }
             }
 
@@ -377,6 +398,17 @@ public class JavaDBMSMagics {
         if (sql.isEmpty())
             return;
 
+        if (args != null) {
+            for (String a : args) {
+                if (a != null && (a.equals("--help") || a.equals("-h"))) {
+                    System.out.println("## %%sqlAsTable - Run SQL and render first SELECT result as table\n\n" +
+                            "Usage: %%sqlAsTable [--help] [format=HTML|CSV] [max=<n>] [showQuery]\n\n" +
+                            "The cell body may contain DDL/DML statements followed by a SELECT; the first SELECT is rendered.");
+                    return;
+                }
+            }
+        }
+
         // parse args: format=HTML|CSV, max=<n>, showQuery
         String format = "HTML";
         int maxRows = 1000;
@@ -423,62 +455,215 @@ public class JavaDBMSMagics {
                         "text/markdown");
             }
 
-            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(normalizedSql)) {
-                ResultSetMetaData md = rs.getMetaData();
-                int cols = md.getColumnCount();
-
-                if (showQuery)
-                    display("````sql\n" + sql + "\n````", "text/markdown");
-
-                // build CSV
-                if ("CSV".equalsIgnoreCase(format)) {
-                    StringBuilder csv = new StringBuilder();
-                    for (int i = 1; i <= cols; i++) {
-                        if (i > 1)
-                            csv.append(',');
-                        csv.append(escapeCsv(md.getColumnLabel(i)));
+            try (Statement st = conn.createStatement()) {
+                // Split the provided SQL into individual statements. The magic allows a
+                // cell to contain DDL/DML statements followed by a final SELECT whose
+                // results are rendered as a table. We therefore execute non-query
+                // statements first (using executeUpdate) and then execute the first
+                // SELECT we encounter with executeQuery to render its ResultSet.
+                java.util.List<String> statements = new java.util.ArrayList<>();
+                StringBuilder cur = new StringBuilder();
+                for (String line : normalizedSql.split("\n")) {
+                    String t = line.trim();
+                    if (t.isEmpty())
+                        continue;
+                    if (t.startsWith("--") || t.startsWith("//") || t.startsWith("#"))
+                        continue;
+                    // Accumulate lines. If a semicolon terminates the statement, split.
+                    cur.append(line).append('\n');
+                    if (t.endsWith(";")) {
+                        String stmt = cur.toString().trim();
+                        // strip trailing semicolon
+                        if (stmt.endsWith(";") )
+                            stmt = stmt.substring(0, stmt.length() - 1).trim();
+                        if (!stmt.isEmpty())
+                            statements.add(stmt);
+                        cur.setLength(0);
                     }
-                    csv.append('\n');
-                    int rowCount = 0;
-                    while (rs.next() && rowCount < maxRows) {
-                        rowCount++;
-                        for (int i = 1; i <= cols; i++) {
-                            if (i > 1)
-                                csv.append(',');
-                            Object v = rs.getObject(i);
-                            csv.append(escapeCsv(v == null ? "" : v.toString()));
+                }
+                if (cur.length() > 0) {
+                    String stmt = cur.toString().trim();
+                    if (!stmt.isEmpty())
+                        statements.add(stmt);
+                }
+
+                // If we found no statements via semicolons, try a simple heuristic:
+                // split on blank-line or detect statement-starting keywords on new lines.
+                if (statements.isEmpty()) {
+                    statements = new java.util.ArrayList<>();
+                    cur.setLength(0);
+                    for (String line : normalizedSql.split("\n")) {
+                        String t = line.trim();
+                        if (t.isEmpty()) {
+                            if (cur.length() > 0) {
+                                statements.add(cur.toString().trim());
+                                cur.setLength(0);
+                            }
+                            continue;
                         }
-                        csv.append('\n');
+                        // if line looks like the start of a statement and we have accumulated content,
+                        // treat it as a new statement boundary
+                        if (cur.length() > 0 && t.matches("(?i)^(CREATE|INSERT|UPDATE|DELETE|SELECT|ALTER|DROP|TRUNCATE|MERGE|REPLACE)\\b.*")) {
+                            statements.add(cur.toString().trim());
+                            cur.setLength(0);
+                        }
+                        cur.append(line).append('\n');
                     }
-                    if (rs.next())
-                        csv.append("# TRUNCATED: more rows available\n");
-                    display(csv.toString(), "text/csv");
-                    return;
+                    if (cur.length() > 0)
+                        statements.add(cur.toString().trim());
                 }
 
-                // default: HTML
-                StringBuilder html = new StringBuilder();
-                html.append("<table border=1 style=\"border-collapse:collapse; width:100%;\">\n<thead><tr>");
-                for (int i = 1; i <= cols; i++)
-                    html.append("<th style=\"text-align:left; padding:4px;\">").append(escapeHtml(md.getColumnLabel(i)))
-                            .append("</th>");
-                html.append("</tr></thead>\n<tbody>\n");
-                int rowCount = 0;
-                while (rs.next() && rowCount < maxRows) {
-                    rowCount++;
-                    html.append("<tr>");
-                    for (int i = 1; i <= cols; i++) {
-                        Object v = rs.getObject(i);
-                        html.append("<td style=\"padding:4px;\">").append(v == null ? "" : escapeHtml(v.toString()))
-                                .append("</td>");
+                ResultSet rs = null;
+                ResultSetMetaData md = null;
+                int cols = 0;
+
+                boolean rendered = false;
+                for (String stmt : statements) {
+                    String sTrim = stmt.trim();
+                    if (sTrim.isEmpty())
+                        continue;
+                    // If this is a SELECT (or starts with WITH), executeQuery and render
+                    if (sTrim.matches("(?i)^(SELECT|WITH)\\b.*")) {
+                        rs = st.executeQuery(sTrim);
+                        md = rs.getMetaData();
+                        cols = md.getColumnCount();
+
+                        if (showQuery)
+                            display("````sql\n" + sTrim + "\n````", "text/markdown");
+
+                        // build CSV
+                        if ("CSV".equalsIgnoreCase(format)) {
+                            StringBuilder csv = new StringBuilder();
+                            for (int i = 1; i <= cols; i++) {
+                                if (i > 1)
+                                    csv.append(',');
+                                csv.append(escapeCsv(md.getColumnLabel(i)));
+                            }
+                            csv.append('\n');
+                            int rowCount = 0;
+                            while (rs.next() && rowCount < maxRows) {
+                                rowCount++;
+                                for (int i = 1; i <= cols; i++) {
+                                    if (i > 1)
+                                        csv.append(',');
+                                    Object v = rs.getObject(i);
+                                    csv.append(escapeCsv(v == null ? "" : v.toString()));
+                                }
+                                csv.append('\n');
+                            }
+                            if (rs.next())
+                                csv.append("# TRUNCATED: more rows available\n");
+                            display(csv.toString(), "text/csv");
+                            rendered = true;
+                            rs.close();
+                            break;
+                        }
+
+                        // default: HTML
+                        StringBuilder html = new StringBuilder();
+                        html.append("<table border=1 style=\"border-collapse:collapse; width:100%;\">\n<thead><tr>");
+                        for (int i = 1; i <= cols; i++)
+                            html.append("<th style=\"text-align:left; padding:4px;\">")
+                                    .append(escapeHtml(md.getColumnLabel(i))).append("</th>");
+                        html.append("</tr></thead>\n<tbody>\n");
+                        int rowCount = 0;
+                        while (rs.next() && rowCount < maxRows) {
+                            rowCount++;
+                            html.append("<tr>");
+                            for (int i = 1; i <= cols; i++) {
+                                Object v = rs.getObject(i);
+                                html.append("<td style=\"padding:4px;\">")
+                                        .append(v == null ? "" : escapeHtml(v.toString())).append("</td>");
+                            }
+                            html.append("</tr>\n");
+                        }
+                        html.append("</tbody></table>");
+                        if (rs.next())
+                            html.append("<div style=\"color:gray;font-size:smaller;\">Results truncated (showing first "
+                                    + maxRows + " rows)</div>");
+                        display(html.toString(), "text/html");
+                        rendered = true;
+                        rs.close();
+                        break;
+                    } else {
+                        // Non-query statement: use executeUpdate where appropriate, otherwise execute
+                        try {
+                            int count = st.executeUpdate(sTrim);
+                            // optionally display the update count for DML statements
+                            if (!sTrim.matches("(?i)^(CREATE|DROP|ALTER|TRUNCATE)\\b.*")) {
+                                display("Updated " + count + " rows", "text/markdown");
+                            }
+                        } catch (SQLException ex) {
+                            // fallback to execute() for statements that may not be supported by executeUpdate
+                            boolean hasResultSet = st.execute(sTrim);
+                            if (hasResultSet) {
+                                rs = st.getResultSet();
+                                md = rs.getMetaData();
+                                cols = md.getColumnCount();
+                                // render first result set as above (CSV/HTML)
+                                if ("CSV".equalsIgnoreCase(format)) {
+                                    StringBuilder csv = new StringBuilder();
+                                    for (int i = 1; i <= cols; i++) {
+                                        if (i > 1)
+                                            csv.append(',');
+                                        csv.append(escapeCsv(md.getColumnLabel(i)));
+                                    }
+                                    csv.append('\n');
+                                    int rowCount = 0;
+                                    while (rs.next() && rowCount < maxRows) {
+                                        rowCount++;
+                                        for (int i = 1; i <= cols; i++) {
+                                            if (i > 1)
+                                                csv.append(',');
+                                            Object v = rs.getObject(i);
+                                            csv.append(escapeCsv(v == null ? "" : v.toString()));
+                                        }
+                                        csv.append('\n');
+                                    }
+                                    if (rs.next())
+                                        csv.append("# TRUNCATED: more rows available\n");
+                                    display(csv.toString(), "text/csv");
+                                    rendered = true;
+                                    rs.close();
+                                    break;
+                                } else {
+                                    StringBuilder html = new StringBuilder();
+                                    html.append("<table border=1 style=\"border-collapse:collapse; width:100%;\">\n<thead><tr>");
+                                    for (int i = 1; i <= cols; i++)
+                                        html.append("<th style=\"text-align:left; padding:4px;\">")
+                                                .append(escapeHtml(md.getColumnLabel(i))).append("</th>");
+                                    html.append("</tr></thead>\n<tbody>\n");
+                                    int rowCount = 0;
+                                    while (rs.next() && rowCount < maxRows) {
+                                        rowCount++;
+                                        html.append("<tr>");
+                                        for (int i = 1; i <= cols; i++) {
+                                            Object v = rs.getObject(i);
+                                            html.append("<td style=\"padding:4px;\">")
+                                                    .append(v == null ? "" : escapeHtml(v.toString()))
+                                                    .append("</td>");
+                                        }
+                                        html.append("</tr>\n");
+                                    }
+                                    html.append("</tbody></table>");
+                                    if (rs.next())
+                                        html.append("<div style=\"color:gray;font-size:smaller;\">Results truncated (showing first "
+                                                + maxRows + " rows)</div>");
+                                    display(html.toString(), "text/html");
+                                    rendered = true;
+                                    rs.close();
+                                    break;
+                                }
+                            }
+                        }
                     }
-                    html.append("</tr>\n");
                 }
-                html.append("</tbody></table>");
-                if (rs.next())
-                    html.append("<div style=\"color:gray;font-size:smaller;\">Results truncated (showing first "
-                            + maxRows + " rows)</div>");
-                display(html.toString(), "text/html");
+
+                if (!rendered) {
+                    // If nothing produced a result set, optionally inform the user.
+                    display("Statements executed", "text/markdown");
+                }
+                return;
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);

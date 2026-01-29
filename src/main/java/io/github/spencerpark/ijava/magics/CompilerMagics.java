@@ -51,6 +51,13 @@ public class CompilerMagics {
 
     @CellMagic("mycompile")
     public void mycompile(List<String> args, String body) {
+        if (args == null) args = List.of();
+        if (args.contains("--help") || args.contains("-h")) {
+            System.out.println("## %%mycompile - Compile a Java source snippet to classpath\n\n" +
+                    "Usage: %%mycompile <FullyQualifiedClassName> [--help]\n\n" +
+                    "Provide the fully qualified class name as first arg; the cell body contains the source.\n");
+            return;
+        }
         if (args.isEmpty()) throw new RuntimeException("Please specify *Class Canonical Name* in args!");
 
         // 1. autofill package base on class canonical name

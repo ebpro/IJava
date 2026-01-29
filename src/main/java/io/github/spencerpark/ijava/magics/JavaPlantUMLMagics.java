@@ -30,6 +30,14 @@ public class JavaPlantUMLMagics {
     public void plantUML(List<String> args, String body) throws IOException {
         // args may include a format (SVG/PNG) and/or a flag to show source for
         // debugging.
+        if (args != null && (args.contains("--help") || args.contains("-h"))) {
+            String help = "## %%plantUML - Render PlantUML from cell\n\n" +
+                    "Usage: %%plantUML [--help] [SVG|PNG] [--show-source]\n\n" +
+                    "Arguments: body contains PlantUML source.\n" +
+                    "Examples:\n%%plantUML SVG\n@startuml\nAlice -> Bob: Hello\n@enduml\n";
+            display(help, "text/markdown");
+            return;
+        }
         boolean showSource = args.stream()
                 .anyMatch(a -> a.equalsIgnoreCase("showSource") || a.equalsIgnoreCase("show-source")
                         || a.equals("--show-source") || a.equals("-s") || a.equalsIgnoreCase("source"));
@@ -71,6 +79,10 @@ public class JavaPlantUMLMagics {
     @CellMagic("plantUMLFile")
     public void plantUMLFile(List<String> args, String body) {
         // sets the results mimetype
+        if (args != null && (args.contains("--help") || args.contains("-h"))) {
+            System.out.println("## %%plantUMLFile - Render PlantUML files\n\nUsage: %%plantUMLFile [--help] [SVG|PNG]\n\nProvide file paths (one per line) in the cell body.");
+            return;
+        }
         if (args.size() > 1)
             throw new IllegalArgumentException("Max one argument : SVG or PNG");
         String fileFormat;

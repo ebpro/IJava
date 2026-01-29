@@ -14,6 +14,15 @@ public class BenchmarkMagics {
         if (body == null)
             body = "";
 
+        // Help
+        if (args.contains("--help") || args.contains("-h")) {
+            System.out.println("## %%benchmark - Compare implementations performance\n\n" +
+                    "Usage: %%benchmark [--help] [--sweep var=<name> start=<n> end=<n> step=<n>] [--chart] [iterations=<n>] [warmup=<n>]\\n\n" +
+                    "Provide one or more implementations separated by a line containing '---'.\n" +
+                    "Example:\n%%benchmark iterations=5\ncode-for-impl-1\n---\ncode-for-impl-2\n");
+            return;
+        }
+
         Map<String, String> opts = OptionUtils.parseOptions(args);
         int iterations = Integer.parseInt(opts.getOrDefault("iterations", "5"));
         int warmup = Integer.parseInt(opts.getOrDefault("warmup", "1"));

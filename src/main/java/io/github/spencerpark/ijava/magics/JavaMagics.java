@@ -24,6 +24,11 @@ public class JavaMagics {
     @CellMagic("javasrcMethodByAnnotationName")
     public void javasrcMethodByAnnotationName(List<String> args, String body) throws IOException {
         Map<String, String> opts = OptionUtils.parseOptions(args);
+        if (opts.containsKey("--help") || opts.containsKey("-h")) {
+            display("**Usage:** `%%javasrcMethodByAnnotationName <FullyQualifiedClassName> <AnnotationName> [index]`\n\n" +
+                    "Extract methods annotated with a given annotation from source file (body should be path to file).", "text/markdown");
+            return;
+        }
         List<String> pos = OptionUtils.positionalArgs(args);
 
         if (pos.size() < 2) {
@@ -161,6 +166,10 @@ public class JavaMagics {
         }
 
         Map<String, String> opts = OptionUtils.parseOptions(args);
+        if (opts.containsKey("--help") || opts.containsKey("-h")) {
+            display("**Usage:** `%%javasrcMethodByName [options] <FullyQualifiedClassName|ClassName> [methodName|index]`\n\nSee documentation for options like `--src`, `methodRegex`, and `selectIndex`.", "text/markdown");
+            return;
+        }
         List<String> pos = OptionUtils.positionalArgs(args);
 
         if (pos.size() < 1 && !opts.containsKey("methodRegex")) {
@@ -242,6 +251,10 @@ public class JavaMagics {
     @CellMagic("javasrcInterfaceByName")
     public void javasrcInterfaceByName(List<String> args, String body) throws IOException {
         Map<String, String> opts = OptionUtils.parseOptions(args);
+        if (opts.containsKey("--help") || opts.containsKey("-h")) {
+            display("**Usage:** `%%javasrcInterfaceByName <FullyQualifiedInterfaceName>`\n\nExtract interface source by fully-qualified name. Body may contain file path.", "text/markdown");
+            return;
+        }
         List<String> pos = OptionUtils.positionalArgs(args);
 
         if (pos.size() < 1) {
@@ -287,6 +300,10 @@ public class JavaMagics {
     @CellMagic("javasrcClassByName")
     public void javasrcClassByName(List<String> args, String body) throws IOException {
         Map<String, String> opts = OptionUtils.parseOptions(args);
+        if (opts.containsKey("--help") || opts.containsKey("-h")) {
+            display("**Usage:** `%%javasrcClassByName <FullyQualifiedClassName>`\n\nExtract entire class source by FQCN. Body may contain file path.", "text/markdown");
+            return;
+        }
         List<String> pos = OptionUtils.positionalArgs(args);
 
         if (pos.isEmpty()) {
@@ -333,6 +350,10 @@ public class JavaMagics {
     @CellMagic("javasrcList")
     public void javasrcList(List<String> args, String body) throws IOException {
         Map<String, String> opts = OptionUtils.parseOptions(args);
+        if (opts.containsKey("--help") || opts.containsKey("-h")) {
+            display("**Usage:** `%%javasrcList <file>`\n\nList classes and methods in a Java file (summary view).", "text/markdown");
+            return;
+        }
         List<String> pos = OptionUtils.positionalArgs(args);
 
         String filename = body;
@@ -365,6 +386,10 @@ public class JavaMagics {
     @CellMagic("javasrcConstructorByName")
     public void javasrcConstructorByName(List<String> args, String body) throws IOException {
         Map<String, String> opts = OptionUtils.parseOptions(args);
+        if (opts.containsKey("--help") || opts.containsKey("-h")) {
+            display("**Usage:** `%%javasrcConstructorByName <FullyQualifiedClassName>`\n\nShow constructors for a class. Body may contain file path.", "text/markdown");
+            return;
+        }
         List<String> pos = OptionUtils.positionalArgs(args);
 
         if (pos.isEmpty()) {
@@ -414,6 +439,10 @@ public class JavaMagics {
     @CellMagic("javasrcFieldByName")
     public void javasrcFieldByName(List<String> args, String body) throws IOException {
         Map<String, String> opts = OptionUtils.parseOptions(args);
+        if (opts.containsKey("--help") || opts.containsKey("-h")) {
+            display("**Usage:** `%%javasrcFieldByName <FullyQualifiedClassName> [filter] [--full=true]`\n\nList or show fields for a class.", "text/markdown");
+            return;
+        }
         List<String> pos = OptionUtils.positionalArgs(args);
 
         if (pos.isEmpty()) {
@@ -507,6 +536,10 @@ public class JavaMagics {
     @CellMagic("javasrcJavadoc")
     public void javasrcJavadoc(List<String> args, String body) throws IOException {
         Map<String, String> opts = OptionUtils.parseOptions(args);
+        if (opts.containsKey("--help") || opts.containsKey("-h")) {
+            display("**Usage:** `%%javasrcJavadoc <FullyQualifiedClassName> [memberName]`\n\nShow javadoc for class or member.", "text/markdown");
+            return;
+        }
         List<String> pos = OptionUtils.positionalArgs(args);
 
         if (pos.isEmpty()) {
