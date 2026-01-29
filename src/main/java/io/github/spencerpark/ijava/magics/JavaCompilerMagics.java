@@ -286,11 +286,5 @@ public class JavaCompilerMagics {
         }
     }
 
-    @CellMagic("mycompile")
-    @Deprecated(forRemoval = true)
-    public void mycompile(List<String> args, String body) throws IOException {
-        System.err.println(
-                "⚠️  WARNING: %%mycompile is deprecated and will be removed in a future version. Use %%compile instead.");
-        compile(args, body);
-    }
+    // Deprecated alias removed: use %%compile instead
 }
