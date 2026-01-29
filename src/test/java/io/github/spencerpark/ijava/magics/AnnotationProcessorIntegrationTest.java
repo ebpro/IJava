@@ -46,7 +46,7 @@ public class AnnotationProcessorIntegrationTest {
                 "    try {\n" +
                 "      for (TypeElement t : annotations) {\n" +
                 "        for (Element e : roundEnv.getElementsAnnotatedWith(t)) {\n" +
-                "          String gen = \"package com.example.gen; public class GeneratedHello { public static String msg() { return \"generated\"; } }\";\n" +
+                "          String gen = \"package com.example.gen; public class GeneratedHello { public static String msg() { return \\\"generated\\\"; } }\";\n" +
                 "          JavaFileObject jf = processingEnv.getFiler().createSourceFile(\"com.example.gen.GeneratedHello\");\n" +
                 "          try (Writer w = jf.openWriter()) { w.write(gen); }\n" +
                 "        }\n" +
@@ -73,7 +73,7 @@ public class AnnotationProcessorIntegrationTest {
         // Now compile a user source that uses the annotation, via JavaCompilerMagics
         JavaCompilerMagics magics = new JavaCompilerMagics(p -> {});
         String userClass = "@com.example.ap.AutoGen public class UseIt { }";
-        List<String> args = List.of("--class=com.example.use.UseIt", "--output=" + out.toString(), "--processor-path=" + procClasses.toString(), "--processor=com.example.ap.AutoGenProcessor");
+        List<String> args = List.of("--class=com.example.use.UseIt", "--output=" + out.toString(), "--processor-path=" + procClasses.toString(), "--processor=com.example.ap.AutoGenProcessor", "--classpath=" + procClasses.toString());
         magics.compile(args, userClass);
 
         Path generatedClass = out.resolve(Path.of("com", "example", "gen", "GeneratedHello.class"));
