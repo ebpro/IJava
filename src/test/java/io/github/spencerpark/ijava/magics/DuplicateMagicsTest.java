@@ -83,15 +83,17 @@ public class DuplicateMagicsTest {
             Class<?> cls = Class.forName(fqcn);
             if (cls.isAnnotationPresent(CellMagic.class)) {
                 CellMagic a = cls.getAnnotation(CellMagic.class);
-                String name = a.value();
-                map.computeIfAbsent(name, k -> new ArrayList<>()).add(fqcn);
+                String v = a.value();
+                if (v != null && !v.isEmpty()) map.computeIfAbsent(v, k -> new ArrayList<>()).add(fqcn);
+                for (String alias : a.aliases()) map.computeIfAbsent(alias, k -> new ArrayList<>()).add(fqcn);
             }
             // also inspect methods
             for (var m : cls.getDeclaredMethods()) {
                 if (m.isAnnotationPresent(CellMagic.class)) {
                     CellMagic a = m.getAnnotation(CellMagic.class);
-                    String name = a.value();
-                    map.computeIfAbsent(name, k -> new ArrayList<>()).add(fqcn + "#" + m.getName());
+                    String v = a.value();
+                    if (v != null && !v.isEmpty()) map.computeIfAbsent(v, k -> new ArrayList<>()).add(fqcn + "#" + m.getName());
+                    for (String alias : a.aliases()) map.computeIfAbsent(alias, k -> new ArrayList<>()).add(fqcn + "#" + m.getName());
                 }
             }
         } catch (ClassNotFoundException e) {
