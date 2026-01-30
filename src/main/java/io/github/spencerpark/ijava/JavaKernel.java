@@ -128,6 +128,7 @@ public class JavaKernel extends BaseKernel {
         magics.registerMagics(new JavaMagics());
         magics.registerMagics(new JavaPlantUMLMagics());
         magics.registerMagics(new ClassDiagramMagics());
+        magics.registerMagics(new TableSchemaMagics());
         // Consolidated shell magics: `MyShellMagics` removed, use `ShellMagics` only.
         magics.registerMagics(new ShellMagics());
         try {

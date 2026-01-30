@@ -305,58 +305,44 @@ public class JavaDBMSMagics {
             for (String tableName : tableNames) {
                 Table table = new Table(tableName);
 
-                // columns
-                try (ResultSet columns = md.getColumns(null, schema, tableName, null)) {
-                    while (columns.next()) {
-                        String columnName = columns.getString("COLUMN_NAME");
-                        table.getFields().put(columnName,
-                                Field.of(columnName,
-                                        columns.getString("COLUMN_SIZE"),
-                                        columns.getString("TYPE_NAME"),
-                                        columns.getString("IS_NULLABLE").equalsIgnoreCase("YES"),
-                                        "YES".equalsIgnoreCase(columns.getString("IS_AUTOINCREMENT"))));
-                    }
+                // use inspector to collect metadata for this table
+                DBMetadataInspector.TableMetadata meta = DBMetadataInspector.inspect(conn, schema, tableName);
+
+                // populate fields
+                for (DBMetadataInspector.ColumnMeta cm : meta.columns) {
+                    Field f = Field.of(cm.name, cm.size > 0 ? String.valueOf(cm.size) : null, cm.type, cm.nullable, false);
+                    table.getFields().put(cm.name, f);
                 }
 
-                // primary keys
-                try (ResultSet primaryKeys = md.getPrimaryKeys(null, schema, tableName)) {
-                    while (primaryKeys.next()) {
-                        String pkCol = primaryKeys.getString("COLUMN_NAME");
-                        if (table.getFields().containsKey(pkCol))
-                            table.getFields().get(pkCol).setRole(Field.Role.PK);
-                    }
+                // mark PKs
+                for (String pk : meta.primaryKeys) {
+                    if (table.getFields().containsKey(pk))
+                        table.getFields().get(pk).setRole(Field.Role.PK);
                 }
 
-                // foreign keys
-                try (ResultSet foreignKeys = md.getImportedKeys(null, schema, tableName)) {
-                    while (foreignKeys.next()) {
-                        String pkTable = foreignKeys.getString("PKTABLE_NAME");
-                        String fkTable = foreignKeys.getString("FKTABLE_NAME");
-                        String pkCol = foreignKeys.getString("PKCOLUMN_NAME");
-                        String fkCol = foreignKeys.getString("FKCOLUMN_NAME");
-                        if (table.getFields().containsKey(fkCol))
-                            table.getFields().get(fkCol).setRole(Field.Role.FK);
+                // mark FKs and produce relationships
+                for (DBMetadataInspector.FKMeta fk : meta.foreignKeys) {
+                    String fkCol = fk.fkColumn;
+                    String pkTable = fk.pkTable;
+                    String pkCol = fk.pkColumn;
+                    if (table.getFields().containsKey(fkCol))
+                        table.getFields().get(fkCol).setRole(Field.Role.FK);
 
-                        // Determine multiplicity on the FK side.
-                        String fkMin = "0";
-                        String fkMax = "*";
-                        if (table.getFields().containsKey(fkCol)) {
-                            Field fkField = table.getFields().get(fkCol);
-                            fkMin = fkField.isNullable() ? "0" : "1";
-                            // If FK column is part of the PK (or unique), treat as max 1
-                            if (fkField.getRole() == Field.Role.PK)
-                                fkMax = "1";
-                        }
-
-                        String pkMultiplicity = "1"; // primary key side is single (unique)
-                        String fkMultiplicity = fkMin + ".." + fkMax;
-
-                        // Emit relationship with multiplicities and a simple label showing column
-                        // mapping
-                        fkBuilder.append(String.format("%s \"%s\" --> \"%s\" %s : %s -> %s\n",
-                                quoteIdentifier(fkTable), fkMultiplicity, pkMultiplicity, quoteIdentifier(pkTable),
-                                quoteIdentifier(fkCol), quoteIdentifier(pkCol)));
+                    // multiplicities: estimate from nullable & PK membership
+                    String fkMin = "0";
+                    String fkMax = "*";
+                    if (table.getFields().containsKey(fkCol)) {
+                        Field fkField = table.getFields().get(fkCol);
+                        fkMin = fkField.isNullable() ? "0" : "1";
+                        if (fkField.getRole() == Field.Role.PK)
+                            fkMax = "1";
                     }
+                    String pkMultiplicity = "1";
+                    String fkMultiplicity = fkMin + ".." + fkMax;
+
+                    fkBuilder.append(String.format("%s \"%s\" --> \"%s\" %s : %s -> %s\n",
+                            quoteIdentifier(tableName), fkMultiplicity, pkMultiplicity, quoteIdentifier(pkTable),
+                            quoteIdentifier(fkCol), quoteIdentifier(pkCol)));
                 }
 
                 out.append(table.toString());
