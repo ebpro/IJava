@@ -133,7 +133,7 @@ public class MagicsTool {
             Class<?> c = Class.forName(fqcn, false, Thread.currentThread().getContextClassLoader());
 
             StringBuilder md = new StringBuilder();
-            md.append("# ").append(c.getName()).append("\n\n");
+            md.append("**").append(c.getName()).append("**\n\n");
             md.append("- Package: ")
                     .append(c.getPackage() == null ? "(default)" : c.getPackage().getName()).append("\n");
             md.append("- Modifiers: ").append(Modifier.toString(c.getModifiers())).append("\n");
@@ -141,13 +141,13 @@ public class MagicsTool {
 
             Annotation[] ann = c.getAnnotations();
             if (ann != null && ann.length > 0) {
-                md.append("## Annotations\n");
+                md.append("**Annotations**\n");
                 for (Annotation a : ann)
                     md.append("- ").append(a.toString()).append("\n");
                 md.append("\n");
             }
 
-            md.append("## Constructors\n");
+            md.append("**Constructors**\n");
             for (Constructor<?> ctor : c.getDeclaredConstructors()) {
                 md.append("- ")
                         .append(Modifier.toString(ctor.getModifiers())).append(" ")
@@ -157,7 +157,7 @@ public class MagicsTool {
                         .append(")\n");
             }
 
-            md.append("\n## Fields\n");
+            md.append("\n**Fields**\n");
             for (Field f : c.getDeclaredFields()) {
                 md.append("- ")
                         .append(Modifier.toString(f.getModifiers())).append(" ")
@@ -165,7 +165,7 @@ public class MagicsTool {
                         .append(f.getName()).append("\n");
             }
 
-            md.append("\n## Methods\n");
+            md.append("\n**Methods**\n");
             for (Method m : c.getDeclaredMethods()) {
                 md.append("- ")
                         .append(Modifier.toString(m.getModifiers())).append(" ")

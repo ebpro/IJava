@@ -178,7 +178,6 @@ public class TableSchemaMagics {
 
             // --------------------- OUTPUT ---------------------
             StringBuilder out = new StringBuilder();
-            out.append("# Table ``").append(tableArg).append("``\n\n");
 
             if (compact) {
                 // Construct relational notation
