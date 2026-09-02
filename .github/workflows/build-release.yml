@@ -29,7 +29,7 @@ permissions:
 jobs:
   build:
     name: Build distribution
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.set-tag.outputs.tag }}
     steps:
