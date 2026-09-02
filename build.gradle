@@ -6,7 +6,7 @@ plugins {
 
 group = 'io.github.spencerpark'
 // Allow overriding version from command line via `-Pversion=...`
-version = (project.findProperty('version') ?: '1.4.5').toString()
+version = (gradle.startParameter.projectProperties.get('version') ?: '1.4.5').toString()
 
 // Java configuration
 java {
@@ -81,6 +81,16 @@ tasks.withType(JavaCompile).configureEach {
     options.compilerArgs << '-parameters'
     options.deprecation = true
     options.release = 21
+}
+
+// Resource filtering
+processResources {
+    filesMatching(['ijava-kernel-metadata.json', 'kernel-metadata.json', 'kernel.json']) {
+        expand(
+            project: rootProject.name,
+            version: project.version
+        )
+    }
 }
 
 // Shadow JAR configuration
