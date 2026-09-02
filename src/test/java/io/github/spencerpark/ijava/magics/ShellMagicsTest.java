@@ -6,9 +6,12 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
+
+import static org.junit.Assume.assumeTrue;
 
 public class ShellMagicsTest {
 
@@ -23,6 +26,7 @@ public class ShellMagicsTest {
 
     @Test
     public void testShellEcho() throws Exception {
+        assumeTrue(new File("/bin/sh").canExecute());
         ShellMagics magics = new ShellMagics();
 
         ByteArrayOutputStream bout = new ByteArrayOutputStream();
@@ -37,6 +41,7 @@ public class ShellMagicsTest {
 
     @Test
     public void testShellTimeout() throws Exception {
+        assumeTrue(new File("/bin/sh").canExecute());
         ShellMagics magics = new ShellMagics();
 
         List<String> args = Arrays.asList("--shell=/bin/sh", "--timeout=1");

@@ -6,10 +6,10 @@ import io.github.spencerpark.jupyter.kernel.display.Renderer;
 import io.github.spencerpark.jupyter.kernel.display.mime.MIMEType;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class Url {
     public static String EMBED_KEY = "embed";
@@ -37,28 +37,51 @@ public class Url {
         } else {
             context.renderIfRequested(MIMEType.TEXT_HTML, () -> {
                 String tag = context.getParameterAsString(HTML_TAG_KEY, "a");
-                String srcAttr = context.getParameterAsString(HTML_SRC_ATTR_KEY, "src");
+                String srcAttr = context.getParameterAsString(HTML_SRC_ATTR_KEY, "href");
                 return renderHTML(tag, srcAttr, url, Collections.emptyMap());
             });
         }
     }
 
-    private static String renderHTML(String tag, String srcAttr, java.net.URL url, Map<String, String> attrs) {
-        String encodedUrl;
-        try {
-            encodedUrl = URLEncoder.encode(url.toExternalForm(), "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e); // Should never happen...
-        }
+    private static final Set<String> HTML_VOID_ELEMENTS = Set.of("area", "base", "br", "col", "embed", "hr",
+            "img", "input", "link", "meta", "param", "source", "track", "wbr");
 
-        //TODO add some html rendering utilities for the url and html entity encoding
+    private static String renderHTML(String tag, String srcAttr, java.net.URL url, Map<String, String> attrs) {
+        String safeTag = sanitizeHtmlName(tag, "a");
+        String safeSrcAttr = sanitizeHtmlName(srcAttr, "href");
+        String externalForm = url.toExternalForm();
         StringBuilder html = new StringBuilder("<");
-        html.append(tag);
-        html.append(" ").append(srcAttr).append("=\"").append(encodedUrl).append('"');
+        html.append(safeTag);
+        html.append(" ").append(safeSrcAttr).append("=\"").append(escapeHtml(externalForm)).append('"');
+        if (safeTag.equals("a") && !attrs.containsKey("target"))
+            html.append(" target=\"_blank\"");
         attrs.forEach((attr, val) -> {
-            if (val != null)
-                html.append(" ").append(attr).append("=\"").append(val).append("\"");
+            if (val != null) {
+                String safeAttr = sanitizeHtmlName(attr, attr);
+                html.append(" ").append(safeAttr).append("=\"").append(escapeHtml(val)).append('"');
+            }
         });
+        if (HTML_VOID_ELEMENTS.contains(safeTag.toLowerCase(Locale.ROOT))) {
+            html.append(" />");
+        } else {
+            html.append(">").append(escapeHtml(externalForm)).append("</").append(safeTag).append('>');
+        }
         return html.toString();
+    }
+
+    private static String sanitizeHtmlName(String value, String defaultValue) {
+        if (value == null || !value.matches("[A-Za-z][A-Za-z0-9-]*"))
+            return defaultValue;
+        return value;
+    }
+
+    private static String escapeHtml(String value) {
+        if (value == null)
+            return "";
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 }

@@ -19,7 +19,7 @@ public class Product {
         return p.id + ":" + p.name + ":" + p.price;
     }
 
-    @Deprecated(since = 1)
+    @Deprecated(since = "1")
     public void oldMethod() {
         System.out.println("old ...");
     }

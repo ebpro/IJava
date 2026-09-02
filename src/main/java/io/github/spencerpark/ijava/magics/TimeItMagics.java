@@ -52,8 +52,8 @@ public class TimeItMagics {
                         && kv[1].matches("\\d+"))
                 .collect(Collectors.toMap(kv -> kv[0], kv -> Integer.parseInt(kv[1])));
 
-        int warmup = params.getOrDefault("warmup", 1);
-        int iterations = params.getOrDefault("iterations", 5);
+        int warmup = Math.max(0, params.getOrDefault("warmup", 1));
+        int iterations = Math.max(1, params.getOrDefault("iterations", 5));
 
         List<Long> samples = new ArrayList<>(iterations);
 

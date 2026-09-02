@@ -38,13 +38,15 @@ public class JavaPlantUMLMagics {
             display(help, "text/markdown");
             return;
         }
-        boolean showSource = args.stream()
+        List<String> safeArgs = args == null ? List.of() : args;
+        boolean showSource = safeArgs.stream()
                 .anyMatch(a -> a.equalsIgnoreCase("showSource") || a.equalsIgnoreCase("show-source")
                         || a.equals("--show-source") || a.equals("-s") || a.equalsIgnoreCase("source"));
-        String fileFormat = args.stream().filter(a -> a.equalsIgnoreCase("SVG") || a.equalsIgnoreCase("PNG"))
+        String fileFormat = safeArgs.stream().filter(a -> a.equalsIgnoreCase("SVG") || a.equalsIgnoreCase("PNG"))
                 .findFirst().orElse("SVG");
 
-        SourceStringReader reader = new SourceStringReader(body);
+        String diagramSource = body == null ? "" : body;
+        SourceStringReader reader = new SourceStringReader(diagramSource);
         final ByteArrayOutputStream os = new ByteArrayOutputStream();
 
         try {
@@ -66,7 +68,7 @@ public class JavaPlantUMLMagics {
         }
 
         if (showSource) {
-            String md = "```plantuml\n" + (body == null ? "" : body) + "\n```";
+            String md = "```plantuml\n" + diagramSource + "\n```";
             display(md, "text/markdown");
         }
 
@@ -83,15 +85,18 @@ public class JavaPlantUMLMagics {
             System.out.println("## %%plantUMLFile - Render PlantUML files\n\nUsage: %%plantUMLFile [--help] [SVG|PNG]\n\nProvide file paths (one per line) in the cell body.");
             return;
         }
-        if (args.size() > 1)
+        List<String> safeArgs = args == null ? List.of() : args;
+        if (safeArgs.size() > 1)
             throw new IllegalArgumentException("Max one argument : SVG or PNG");
         String fileFormat;
-        if (args.isEmpty())
+        if (safeArgs.isEmpty())
             fileFormat = "SVG";
         else
-            fileFormat = args.get(0);
+            fileFormat = safeArgs.get(0);
 
         List<Object> outList = new ArrayList<>();
+        if (body == null)
+            return;
         body.lines().forEach(filename -> {
             try {
                 Object out = cellMagic("plantUML", args, Files.readString(Paths.get(filename)));

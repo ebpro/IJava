@@ -12,12 +12,22 @@ public class PublishStatusAdapter implements JsonDeserializer<PublishStatus> {
 
     @Override
     public PublishStatus deserialize(JsonElement element, Type type, JsonDeserializationContext ctx) throws JsonParseException {
-        PublishStatus.State state = ctx.deserialize(element.getAsJsonObject().get("execution_result"), PublishStatus.State.class);
-        switch (state) {
-            case BUSY: return PublishStatus.BUSY;
-            case IDLE: return PublishStatus.IDLE;
-            case STARTING: return PublishStatus.STARTING;
-            default: return null;
+        if (element == null || !element.isJsonObject())
+            return null;
+
+        JsonObject object = element.getAsJsonObject();
+        JsonElement stateElement = object.get("execution_state");
+        if (stateElement == null || stateElement.isJsonNull())
+            return null;
+
+        PublishStatus.State state;
+        try {
+            state = ctx.deserialize(stateElement, PublishStatus.State.class);
+        } catch (JsonParseException | IllegalArgumentException e) {
+            return null;
         }
+        if (state == null)
+            return null;
+        return PublishStatus.forState(state);
     }
 }

@@ -1,12 +1,18 @@
 package io.github.spencerpark.ijava.magics;
 
 import java.io.IOException;
+import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public final class PathResolver {
     private PathResolver() {
@@ -37,10 +43,31 @@ public final class PathResolver {
 
         try {
             final String simple = className + ".java";
-            Optional<Path> found = Files.walk(Paths.get(".")).filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().equals(simple)).findFirst();
-            if (found.isPresent())
-                return found;
+            final Path start = Paths.get(".");
+            final List<Path> found = new ArrayList<>();
+            final int maxDepth = 5;
+            final Set<String> excludedDirectories = Set.of(".git", ".gradle", "build", ".venv", "node_modules",
+                    "target", "dist", "out", ".idea", ".vscode");
+            Files.walkFileTree(start, EnumSet.noneOf(FileVisitOption.class), maxDepth, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    if (!dir.equals(start) && dir.getFileName() != null
+                            && excludedDirectories.contains(dir.getFileName().toString()))
+                        return FileVisitResult.SKIP_SUBTREE;
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (attrs.isRegularFile() && file.getFileName().toString().equals(simple)) {
+                        found.add(file);
+                        return FileVisitResult.TERMINATE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+            if (!found.isEmpty())
+                return Optional.of(found.get(0));
         } catch (IOException ignored) {
         }
 

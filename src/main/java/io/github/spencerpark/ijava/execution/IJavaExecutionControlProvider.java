@@ -49,8 +49,9 @@ public class IJavaExecutionControlProvider implements ExecutionControlProvider {
 
     /**
      * Default per-statement timeout applied when no {@value #TIMEOUT_KEY} parameter is
-     * configured. Suits classroom use where a runaway statement should not hang the
-     * kernel indefinitely. Set {@code IJAVA_TIMEOUT=-1} to disable the timeout.
+     * configured. The {@code IJAVA_TIMEOUT} environment variable or the
+     * {@value #TIMEOUT_KEY} parameter can override this value. Set
+     * {@code IJAVA_TIMEOUT=-1} or {@code timeout=-1} to disable the timeout.
      */
     public static final long DEFAULT_TIMEOUT = 60;
     public static final TimeUnit DEFAULT_TIMEOUT_UNIT = TimeUnit.SECONDS;
