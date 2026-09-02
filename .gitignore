@@ -20,6 +20,7 @@ tests/
 
 .envrc
 .use-google-ai
+.opencode/
 
 
 # Eclipse

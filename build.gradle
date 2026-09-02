@@ -5,7 +5,7 @@ plugins {
 
 group = 'io.github.spencerpark'
 // Allow overriding version from command line via `-Pversion=...`
-version = (gradle.startParameter.projectProperties.get('version') ?: '1.4.5').toString()
+version = (gradle.startParameter.projectProperties.get('version') ?: '1.4.6').toString()
 
 // Java configuration
 java {

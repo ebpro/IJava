@@ -63,7 +63,7 @@ jobs:
       - name: Build package
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon -Pversion=${{ steps.set-tag.outputs.tag }} clean packDist
+          ./gradlew --no-daemon -Pversion=${{ steps.set-tag.outputs.tag }} clean build shadowJar packDist
 
       - name: Prepare artifact and checksum
         run: |
@@ -110,16 +110,14 @@ jobs:
           JAR=$(find smoke -name "*.jar" | head -n1)
 
           python3 -m venv venv
-          ./venv/bin/pip install jupyter nbconvert jupyter-client
+          ./venv/bin/pip install jupyter-client nbconvert
 
-          # Simplified kernel install
-          mkdir -p kernel_meta
-          echo "{\"argv\":[\"java\",\"-jar\",\"$(realpath $JAR)\",\"{connection_file}\"],\"display_name\":\"Java\",\"language\":\"java\"}" > kernel_meta/kernel.json
-          ./venv/bin/jupyter kernelspec install --sys-prefix --name ijavatest --replace ./kernel_meta
+          # Install through the release installer
+          ./venv/bin/python smoke/install.py --sys-prefix --replace
 
           # Create and execute test notebook
-          echo '{"cells":[{"cell_type":"code","execution_count":null,"metadata":{},"outputs":[],"source":["System.out.println(\"Hello\");"]}],"metadata":{},"nbformat":4,"nbformat_minor":4}' > test.ipynb
-          ./venv/bin/jupyter nbconvert --to notebook --execute test.ipynb --ExecutePreprocessor.kernel_name=ijavatest
+          echo '{"cells":[{"cell_type":"code","execution_count":null,"metadata":{},"outputs":[],"source":["System.out.println(\"Hello from IJava\");","42"]}],"metadata":{},"nbformat":4,"nbformat_minor":4}' > test.ipynb
+          ./venv/bin/python -m nbconvert --to notebook --execute test.ipynb --ExecutePreprocessor.kernel_name=java
 
   publish:
     name: Create Release

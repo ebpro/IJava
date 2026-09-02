@@ -160,13 +160,13 @@ if __name__ == '__main__':
         setattr(args, "env", {})
 
     # Install the kernel
-    install_dest = KernelSpecManager().install_kernel_spec(
+    install_dest = str(KernelSpecManager().install_kernel_spec(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), 'java'),
         kernel_name='java',
         user=args.user,
         prefix=sys.prefix if args.sys_prefix else args.prefix,
-        ## replace=args.replace
-    )
+        replace=args.replace
+    ))
 
     # Connect the self referencing token left in the kernel.json to point to it's install location.
 
