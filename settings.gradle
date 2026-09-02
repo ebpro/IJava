@@ -15,12 +15,12 @@ buildCache {
 
 // Set Java compatibility
 ext {
-    minJavaVersion = JavaVersion.VERSION_21
-    targetJavaVersion = JavaVersion.VERSION_21
+    minJavaVersion = JavaVersion.VERSION_25
+    targetJavaVersion = JavaVersion.VERSION_25
 }
 
 // Verify Java version
-def javaVersion = org.gradle.internal.jvm.Jvm.current().javaVersion
+def javaVersion = JavaVersion.current()
 def minVersion = JavaVersion.toVersion(minJavaVersion)
 
 if (javaVersion < minVersion) {

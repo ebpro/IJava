@@ -3,7 +3,7 @@
 Fork from [SpencerPark](https://github.com/SpencerPark)/[IJava](https://github.com/SpencerPark/IJava), but with some new
 features and magics:
 
-* Upgrade to jdk 17 and gradle 7.3.3
+* Upgrade to JDK 25 and Gradle 9.7.1
 * Print with variable name or source
   ![timeout](docs/img/print-with-var-name.png)
 * add `print` function and `printerPrefix` line magic
@@ -95,14 +95,14 @@ Currently the kernel supports
 
 ### Requirements
 
-1. [Java JDK >= 21](http://www.oracle.com/technetwork/java/javase/downloads/index.html). **Not the JRE**.
+1. [Java JDK >= 25](http://www.oracle.com/technetwork/java/javase/downloads/index.html). **Not the JRE**.
 
     1. Ensure that the `java` command is in the PATH and is using a modern version. For example:
        ```bash
        > java -version
-       openjdk version "21.0.11" 2026-04-21
-       OpenJDK Runtime Environment Temurin-21.0.11+10 (build 21.0.11+10)
-       OpenJDK 64-Bit Server VM Temurin-21.0.11+10 (build 21.0.11+10, mixed mode, sharing)
+        openjdk version "25.0.4"
+        OpenJDK Runtime Environment Temurin-25.0.4 (build 25.0.4)
+        OpenJDK 64-Bit Server VM Temurin-25.0.4 (build 25.0.4, mixed mode, sharing)
        ```
 
     2. Next ensure that `java` is in a location where the jdk was installed and not just the jre. Use
