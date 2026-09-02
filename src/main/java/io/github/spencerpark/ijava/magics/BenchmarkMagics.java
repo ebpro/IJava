@@ -19,7 +19,11 @@ public class BenchmarkMagics {
             System.out.println("## %%benchmark - Compare implementations performance\n\n" +
                     "Usage: %%benchmark [--help] [--sweep var=<name> start=<n> end=<n> step=<n>] [--chart] [iterations=<n>] [warmup=<n>]\\n\n" +
                     "Provide one or more implementations separated by a line containing '---'.\n" +
-                    "Example:\n%%benchmark iterations=5\ncode-for-impl-1\n---\ncode-for-impl-2\n");
+                    "Example:\n%%benchmark iterations=5\ncode-for-impl-1\n---\ncode-for-impl-2\n\n" +
+                    "NOTE: timings are measured through jshell snippet evaluation, so they include\n" +
+                    "snippet compilation and dispatch overhead. Use %%benchmark for classroom-level\n" +
+                    "comparisons only. For publication-grade microbenchmarks use JMH, e.g.\n" +
+                    "  %%maven org.openjdk.jmh:jmh-core:1.37\n");
             return;
         }
 

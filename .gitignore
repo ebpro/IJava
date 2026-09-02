@@ -21,3 +21,10 @@ tests/
 .envrc
 .use-google-ai
 
+
+# Eclipse
+.classpath
+.factorypath
+.project
+.settings/
+bin/
