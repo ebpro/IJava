@@ -31,7 +31,6 @@ repositories {
 
 // Dependency versions
 def versions = [
-    jupyterKernel: '2.3.0',
     gson: '2.10.1',
     mavenResolver: '1.8.2',
     mavenProvider: '3.8.6',
@@ -40,10 +39,16 @@ def versions = [
     lombok: '1.18.48'
 ]
 
-dependencies {
-    implementation("io.github.spencerpark:jupyter-jvm-basekernel:${versions.jupyterKernel}") {
-        exclude group: 'com.google.code.gson', module: 'gson'
+configurations.all {
+    resolutionStrategy {
+        force 'com.google.guava:guava:33.5.0-jre'
+        force 'com.google.guava:failureaccess:1.0.3'
+        force 'com.google.errorprone:error_prone_annotations:2.41.0'
     }
+}
+
+dependencies {
+    implementation project(':basekernel')
     implementation "com.google.code.gson:gson:${versions.gson}"
 
     // Maven resolver dependencies
@@ -65,7 +70,9 @@ dependencies {
     implementation 'com.github.javaparser:javaparser-symbol-solver-core:3.25.8'
     // PlantUML for diagrams
     //implementation 'net.sourceforge.plantuml:plantuml:1.2024.1'
-    implementation 'net.sourceforge.plantuml:plantuml:1.2026.0'
+    implementation('net.sourceforge.plantuml:plantuml:1.2026.0') {
+        transitive = false
+    }
 
     // ClassGraph for classpath scanning
     implementation 'io.github.classgraph:classgraph:4.8.168'
@@ -98,7 +105,15 @@ processResources {
 // Shadow JAR configuration
 shadowJar {
     archiveClassifier.set('all')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     mergeServiceFiles()
+    exclude 'module-info.class'
+    exclude 'META-INF/versions/*/module-info.class'
+    exclude 'META-INF/MANIFEST.MF'
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+    exclude 'META-INF/INDEX.LIST'
     manifest {
         attributes(
             'Main-Class': 'io.github.spencerpark.ijava.IJava',

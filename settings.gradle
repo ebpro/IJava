@@ -4,6 +4,7 @@
 
 // Project identification
 rootProject.name = 'IJava'
+include 'basekernel'
 
 // Enable build cache
 buildCache {
