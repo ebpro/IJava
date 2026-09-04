@@ -26,12 +26,29 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 25
+      - name: Set up JDK 25 (GitHub-hosted fallback)
+        if: vars.SONAR_RUNNER == ''
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '25'
           cache: 'gradle'
+
+      - name: Use preinstalled JDK 25
+        if: vars.SONAR_RUNNER != ''
+        run: |
+          set -euo pipefail
+          if [ ! -x /opt/java/openjdk/bin/java ]; then
+            echo "::error::Expected preinstalled Temurin 25 at /opt/java/openjdk"
+            exit 1
+          fi
+          /opt/java/openjdk/bin/java -version 2>&1 | tee java-version.txt
+          if ! grep -q 'version "25\.' java-version.txt; then
+            echo "::error::Expected Java 25 on the self-hosted runner"
+            exit 1
+          fi
+          echo "JAVA_HOME=/opt/java/openjdk" >> "$GITHUB_ENV"
+          echo "/opt/java/openjdk/bin" >> "$GITHUB_PATH"
 
       - name: Validate SonarQube configuration
         run: |
