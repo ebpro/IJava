@@ -53,8 +53,44 @@ jobs:
           chmod +x ./gradlew
           ./gradlew --no-daemon clean build shadowJar packDist
 
+      - name: Prepare SonarQube analysis target
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.number }}
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            TARGET_BRANCH="$BASE_REF"
+            echo "SONAR_SCAN_ARGS=-Dsonar.pullRequest.key=$PR_NUMBER -Dsonar.pullRequest.branch=$HEAD_REF -Dsonar.pullRequest.base=$BASE_REF" >> "$GITHUB_ENV"
+          else
+            if [ "$REF_NAME" = "main" ] || [ "$REF_NAME" = "master" ]; then
+              TARGET_BRANCH="$REF_NAME"
+            else
+              TARGET_BRANCH="master"
+            fi
+            echo "SONAR_SCAN_ARGS=-Dsonar.branch.name=$TARGET_BRANCH" >> "$GITHUB_ENV"
+          fi
+          echo "SONAR_TARGET_BRANCH=$TARGET_BRANCH" >> "$GITHUB_ENV"
+
+      - name: Ensure SonarQube branch exists
+        if: env.SONAR_TARGET_BRANCH != ''
+        run: |
+          response=$(curl -sS -w '\n%{http_code}' -u "$SONAR_TOKEN:" -X POST "$SONAR_HOST_URL/api/project_branches/create?projectKey=ijava&branchName=$SONAR_TARGET_BRANCH")
+          http_code=$(printf '%s' "$response" | tail -n 1)
+          body=$(printf '%s' "$response" | sed '$d')
+          if [ "$http_code" = "200" ] || [ "$http_code" = "204" ]; then
+            echo "SonarQube branch ready: $SONAR_TARGET_BRANCH"
+          elif printf '%s' "$body" | grep -qi "already exists"; then
+            echo "SonarQube branch already exists: $SONAR_TARGET_BRANCH"
+          else
+            echo "::error::Failed to create SonarQube branch $SONAR_TARGET_BRANCH (HTTP $http_code): $body"
+            exit 1
+          fi
+
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@v6
         with:
-          args: >
-            -Dsonar.projectVersion=${{ github.sha }}
+          args: ${{ env.SONAR_SCAN_ARGS }} -Dsonar.projectVersion=${{ github.sha }}
+          waitForQualityGate: false
