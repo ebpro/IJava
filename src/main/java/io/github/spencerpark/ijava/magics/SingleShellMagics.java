@@ -28,11 +28,8 @@ public class SingleShellMagics implements AutoCloseable {
     private final TimeUnit defaultTimeoutUnit = TimeUnit.SECONDS;
 
     public SingleShellMagics() throws IOException {
-        String shell = System.getenv("SHELL");
-        if (shell == null || shell.isEmpty()) {
-            shell = "/bin/zsh";
-        }
-        
+        String shell = resolveShell();
+
         outputBuffer = new StringBuffer();
         shellProcess = new ProcessBuilder(shell).start();
         shellWriter = new BufferedWriter(new OutputStreamWriter(shellProcess.getOutputStream()));
@@ -46,6 +43,23 @@ public class SingleShellMagics implements AutoCloseable {
                 }
             }));
         executorService.submit(new StreamGobbler(shellProcess.getErrorStream(), System.err::println));
+    }
+
+    private static String resolveShell() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("win")) {
+            String comspec = System.getenv("ComSpec");
+            return comspec != null && !comspec.isBlank() ? comspec : "cmd.exe";
+        }
+
+        String[] candidates = {System.getenv("SHELL"), "/bin/zsh", "/bin/bash", "/bin/sh"};
+        for (String candidate : candidates) {
+            if (candidate != null && !candidate.isBlank() && new File(candidate).canExecute()) {
+                return candidate;
+            }
+        }
+
+        return "/bin/sh";
     }
 
     @CellMagic("commonshell")

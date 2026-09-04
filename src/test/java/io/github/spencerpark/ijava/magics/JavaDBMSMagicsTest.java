@@ -99,12 +99,10 @@ public class JavaDBMSMagicsTest {
     }
 
     @Test
-    public void testRdbmsSchemaRunsWithoutException() {
+    public void testRdbmsSchemaSourceOnlyRunsWithoutException() {
         JavaDBMSMagics magics = new JavaDBMSMagics();
-        // Request showSource so the PlantUML text is displayed instead of relying on
-        // external renderers
         try {
-            magics.rdbmsSchema(Collections.singletonList("showSource"), "");
+            magics.rdbmsSchema(Collections.singletonList("sourceOnly"), "");
         } catch (Exception e) {
             fail("rdbmsSchema threw: " + e.getMessage());
             return;

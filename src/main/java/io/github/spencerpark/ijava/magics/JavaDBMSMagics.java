@@ -171,7 +171,7 @@ public class JavaDBMSMagics {
             for (String a : args) {
                 if (a != null && (a.equals("--help") || a.equals("-h"))) {
                     System.out.println("## %%rdbmsSchema - Render DB schema as PlantUML\n\n" +
-                            "Usage: %%rdbmsSchema [--help] [<schema>] [SVG|PNG] [--show-source] [include=<regex>] [exclude=<regex>]\n\n" +
+                            "Usage: %%rdbmsSchema [--help] [<schema>] [SVG|PNG] [--show-source] [--source-only] [include=<regex>] [exclude=<regex>]\n\n" +
                             "Provide table names in the cell body (one per line) to limit the diagram.");
                     return;
                 }
@@ -181,6 +181,7 @@ public class JavaDBMSMagics {
         // [include=<regex>] [exclude=<regex>] [scale=<n>]
         String schema = null;
         boolean showSource = false;
+        boolean sourceOnly = false;
         String fileFormat = "SVG";
         boolean handwritten = false;
         String includeRegex = null;
@@ -196,6 +197,11 @@ public class JavaDBMSMagics {
             }
             if (aa.equalsIgnoreCase("showSource") || aa.equalsIgnoreCase("show-source") || aa.equals("--show-source")
                     || aa.equals("-s") || aa.equalsIgnoreCase("source")) {
+                showSource = true;
+                continue;
+            }
+            if (aa.equalsIgnoreCase("sourceOnly") || aa.equalsIgnoreCase("source-only") || aa.equals("--source-only")) {
+                sourceOnly = true;
                 showSource = true;
                 continue;
             }
@@ -354,6 +360,9 @@ public class JavaDBMSMagics {
             // Optionally display the generated PlantUML source for debugging
             if (showSource) {
                 display("```plantuml\n" + out.toString() + "\n```", "text/markdown");
+            }
+            if (sourceOnly) {
+                return;
             }
 
             // render via PlantUML with requested format

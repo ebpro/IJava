@@ -22,7 +22,9 @@ public class SingleShellMagicsTest {
 
     @After
     public void tearDown() {
-        singleShellMagics.close();
+        if (singleShellMagics != null) {
+            singleShellMagics.close();
+        }
     }
 
     @Test
