@@ -142,7 +142,7 @@ public class MavenResolver {
         Map<String, List<String>> argMap = schema.parse(args);
 
         // Show help if requested
-        if (argMap.containsKey("help")) {
+        if (!argMap.get("help").isEmpty()) {
             System.out.println("""
                     ## %pom - Load dependencies from a Maven POM file
 

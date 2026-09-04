@@ -12,7 +12,9 @@ import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import static org.junit.Assert.fail;
 
@@ -21,6 +23,7 @@ public class JavaDBMSMagicsTest {
     private JavaKernel kernel;
     private java.util.concurrent.atomic.AtomicReference<DisplayData> lastDisplayData = new java.util.concurrent.atomic.AtomicReference<>();
     private java.util.concurrent.atomic.AtomicReference<String> lastDisplayString = new java.util.concurrent.atomic.AtomicReference<>();
+    private final List<DisplayData> displayedData = new ArrayList<>();
 
     @Before
     public void setUp() throws Exception {
@@ -42,8 +45,11 @@ public class JavaDBMSMagicsTest {
         kernel = new JavaKernel() {
             @Override
             public void display(DisplayData data) {
-                lastDisplayData.set(data);
-                lastDisplayString.set(String.valueOf(data));
+                if (data != null) {
+                    displayedData.add(data);
+                    lastDisplayData.set(data);
+                    lastDisplayString.set(String.valueOf(data));
+                }
                 // do not call super.display to avoid I/O side effects
             }
         };
@@ -62,6 +68,7 @@ public class JavaDBMSMagicsTest {
 
         lastDisplayData.set(null);
         lastDisplayString.set(null);
+        displayedData.clear();
 
         System.clearProperty("jdbc.url");
         System.clearProperty("jdbc.user");
@@ -103,17 +110,27 @@ public class JavaDBMSMagicsTest {
             return;
         }
 
-        String rendered2 = extractRendered(lastDisplayData.get());
-        if (rendered2 == null) {
+        List<String> renderedOutputs = new ArrayList<>();
+        for (DisplayData dd : displayedData) {
+            String rendered = extractRendered(dd);
+            if (rendered != null) {
+                renderedOutputs.add(rendered);
+            }
+        }
+        if (renderedOutputs.isEmpty()) {
             fail("No display output captured for rdbmsSchema");
             return;
         }
-        // PlantUML output may be raw source or an SVG containing plantuml markers.
-        boolean hasPlantUmlSource = rendered2.contains("@startuml") || rendered2.contains("<?plantuml");
-        boolean hasSvg = rendered2.contains("<svg") && rendered2.contains("<?plantuml-src");
-        boolean hasTableMarker = rendered2.contains("table(") || rendered2.contains("PERSON");
-        if (!(hasPlantUmlSource || hasSvg) || !hasTableMarker) {
-            fail("Unexpected display output for rdbmsSchema: " + rendered2);
+        // `showSource` displays the PlantUML source and then the magic may also render/display
+        // SVG/PNG output. The assertion must therefore inspect every displayed output, not only
+        // the final rendered image.
+        boolean hasPlantUmlSource = renderedOutputs.stream()
+                .anyMatch(rendered -> rendered.contains("@startuml") || rendered.contains("```plantuml"));
+        boolean hasTableMarker = renderedOutputs.stream()
+                .anyMatch(rendered -> rendered.contains("table(") || rendered.contains("PERSON")
+                        || rendered.contains("person"));
+        if (!hasPlantUmlSource || !hasTableMarker) {
+            fail("Unexpected display outputs for rdbmsSchema: " + renderedOutputs);
         }
     }
 
