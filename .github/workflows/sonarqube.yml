@@ -3,9 +3,9 @@ name: SonarQube
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main, master]
+    branches: ['**']
   push:
-    branches: [main, master]
+    branches: ['**']
 
 concurrency:
   group: sonarqube-${{ github.workflow }}-${{ github.ref }}
@@ -81,12 +81,7 @@ jobs:
           if [ "$EVENT_NAME" = "pull_request" ]; then
             echo "SONAR_SCAN_ARGS=-Dsonar.pullRequest.key=$PR_NUMBER -Dsonar.pullRequest.branch=$HEAD_REF -Dsonar.pullRequest.base=$BASE_REF" >> "$GITHUB_ENV"
           else
-            if [ "$REF_NAME" = "main" ] || [ "$REF_NAME" = "master" ]; then
-              BRANCH_NAME="$REF_NAME"
-            else
-              BRANCH_NAME="master"
-            fi
-            echo "SONAR_SCAN_ARGS=-Dsonar.branch.name=$BRANCH_NAME" >> "$GITHUB_ENV"
+            echo "SONAR_SCAN_ARGS=-Dsonar.branch.name=$REF_NAME" >> "$GITHUB_ENV"
           fi
 
       - name: SonarQube Scan
