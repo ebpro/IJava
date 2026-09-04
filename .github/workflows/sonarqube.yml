@@ -17,7 +17,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || vars.SONAR_HOST_URL != '' || vars.SONAR_PUBLIC_URL != ''
     runs-on: ${{ vars.SONAR_RUNNER || 'ubuntu-latest' }}
     env:
-      SONAR_HOST_URL: ${{ vars.SONAR_PUBLIC_URL || vars.SONAR_HOST_URL }}
+      SONAR_HOST_URL: ${{ vars.SONAR_RUNNER && vars.SONAR_HOST_URL || vars.SONAR_PUBLIC_URL || vars.SONAR_HOST_URL }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_RUNNER: ${{ vars.SONAR_RUNNER }}
     steps:
