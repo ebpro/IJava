@@ -93,4 +93,3 @@ jobs:
         uses: sonarsource/sonarqube-scan-action@v6
         with:
           args: ${{ env.SONAR_SCAN_ARGS }} -Dsonar.projectVersion=${{ github.sha }}
-          waitForQualityGate: false
