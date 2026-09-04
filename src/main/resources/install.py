@@ -160,13 +160,13 @@ if __name__ == '__main__':
         setattr(args, "env", {})
 
     # Install the kernel
-    install_dest = KernelSpecManager().install_kernel_spec(
+    install_dest = str(KernelSpecManager().install_kernel_spec(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), 'java'),
         kernel_name='java',
         user=args.user,
         prefix=sys.prefix if args.sys_prefix else args.prefix,
-        ## replace=args.replace
-    )
+        replace=args.replace
+    ))
 
     # Connect the self referencing token left in the kernel.json to point to it's install location.
 
@@ -183,11 +183,30 @@ if __name__ == '__main__':
     # in the installed kernel.json from the local template.
     with open(local_kernel_json_path, 'r') as template_kernel_json_file:
         template_kernel_json_contents = template_kernel_json_file.read()
+        # Load the template JSON and programmatically update fields so we can
+        # point argv to the actual jar bundled in the `java/` subdirectory.
         kernel_json_contents = template_kernel_json_contents.replace(
             '@KERNEL_INSTALL_DIRECTORY@',
             install_dest_json_fragment
         )
         kernel_json_json_contents = json.loads(kernel_json_contents)
+
+        # If the distribution contains a jar in the installed directory,
+        # set argv[2] to that jar path so the kernelspec points at the real file.
+        try:
+            if os.path.isdir(install_dest):
+                # prefer any jar (last alphabetically) - this will be the renamed shadow jar
+                jars = sorted([f for f in os.listdir(install_dest) if f.endswith('.jar')])
+                if jars:
+                    jar_path = os.path.join(install_dest, jars[-1])
+                    argv = kernel_json_json_contents.get('argv')
+                    if isinstance(argv, list) and len(argv) > 2:
+                        argv[2] = jar_path
+                        kernel_json_json_contents['argv'] = argv
+        except Exception:
+            # best-effort: do not fail install if we cannot locate the jar
+            pass
+
         kernel_env = kernel_json_json_contents.setdefault('env', {})
         for k, v in args.env.items():
             kernel_env[k] = v

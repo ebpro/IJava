@@ -5,49 +5,159 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name to use for release (optional for manual dispatch)'
+        required: false
+      prerelease:
+        description: 'Mark release as prerelease'
+        required: false
+        default: 'true'
+      publish:
+        description: 'Create GitHub release (if false, workflow only builds and tests)'
+        required: false
+        default: 'true'
+      run_smoke_test:
+        description: 'Run smoke test before publishing'
+        required: false
+        default: 'true'
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  build-and-release:
-    runs-on: ubuntu-latest
+  build:
+    name: Build distribution
+    runs-on: ${{ vars.BUILD_RUNNER || 'ubuntu-latest' }}
+    outputs:
+      tag: ${{ steps.set-tag.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - name: Set up JDK 25 (GitHub-hosted fallback)
+        if: vars.BUILD_RUNNER == ''
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '25'
           cache: 'gradle'
+
+      - name: Use preinstalled JDK 25
+        if: vars.BUILD_RUNNER != ''
+        run: |
+          set -euo pipefail
+          if [ ! -x /opt/java/openjdk/bin/java ]; then
+            echo "::error::Expected preinstalled Temurin 25 at /opt/java/openjdk"
+            exit 1
+          fi
+          /opt/java/openjdk/bin/java -version 2>&1 | tee java-version.txt
+          if ! grep -q 'version "25\.' java-version.txt; then
+            echo "::error::Expected Java 25 on the self-hosted runner"
+            exit 1
+          fi
+          echo "JAVA_HOME=/opt/java/openjdk" >> "$GITHUB_ENV"
+          echo "/opt/java/openjdk/bin" >> "$GITHUB_PATH"
+
+      - name: Determine tag
+        id: set-tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "${{ github.event.inputs.tag }}" ]; then
+              TAG_NAME="${{ github.event.inputs.tag }}"
+            else
+              # Fallback to gradle version if no input provided
+              TAG_NAME=$(./gradlew -q properties | grep ^version: | awk '{print $2}')
+            fi
+          else
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
 
       - name: Build package
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon clean packDist
+          ./gradlew --no-daemon -Pversion=${{ steps.set-tag.outputs.tag }} clean build shadowJar packDist
 
       - name: Prepare artifact and checksum
         run: |
           set -euo pipefail
-          ARTIFACT=$(ls build/distributions/*.zip | head -n1)
-          if [ -z "${ARTIFACT:-}" ]; then
-            echo "No distribution zip found in build/distributions" >&2
-            ls -la build || true
-            exit 1
-          fi
-          sha256sum "$ARTIFACT" > "$ARTIFACT.sha256"
-          echo "Created $ARTIFACT and checksum"
-          ls -l "$ARTIFACT" "$ARTIFACT.sha256"
+          TAG=${{ steps.set-tag.outputs.tag }}
+          # Look for the zip regardless of name, then rename it to a standard format for the artifact
+          RAW_ZIP=$(ls build/distributions/*.zip | head -n1)
+          cp "$RAW_ZIP" "IJava-${TAG}.zip"
+          sha256sum "IJava-${TAG}.zip" > "IJava-${TAG}.zip.sha256"
 
-      - name: Create GitHub Release and upload assets
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
         with:
-          # include a release body if you maintain UPGRADE.md or CHANGELOG
+          name: distribution
+          path: |
+            IJava-${{ steps.set-tag.outputs.tag }}.zip
+            IJava-${{ steps.set-tag.outputs.tag }}.zip.sha256
+
+  smoke-test:
+    name: Smoke-test distribution
+    needs: build
+    runs-on: ubuntu-latest
+    # Run if manual dispatch asks for it OR if it's a tag push
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.run_smoke_test == 'true' }}
+    steps:
+      - name: Download distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: distribution
+
+      - name: Set up JDK 25 for smoke-test
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+
+      - name: Run smoke test
+        run: |
+          set -euo pipefail
+          DIST=$(ls IJava-*.zip | head -n1)
+          unzip -q "$DIST" -d smoke
+
+          # Find the JAR (supporting both flat and nested structures)
+          JAR=$(find smoke -name "*.jar" | head -n1)
+
+          python3 -m venv venv
+          ./venv/bin/pip install jupyter-client nbconvert
+
+          # Install through the release installer
+          ./venv/bin/python smoke/install.py --sys-prefix --replace
+
+          # Create and execute test notebook
+          echo '{"cells":[{"cell_type":"code","execution_count":null,"metadata":{},"outputs":[],"source":["System.out.println(\"Hello from IJava\");","42"]}],"metadata":{},"nbformat":4,"nbformat_minor":4}' > test.ipynb
+          ./venv/bin/python -m nbconvert --to notebook --execute test.ipynb --ExecutePreprocessor.kernel_name=java
+
+  publish:
+    name: Create Release
+    needs: [build, smoke-test]
+    runs-on: ubuntu-latest # No need for self-hosted here usually, ubuntu-latest is safer for API calls
+    if: ${{ always() && (needs.smoke-test.result == 'success' || needs.smoke-test.result == 'skipped') && (startsWith(github.ref, 'refs/tags/') || github.event.inputs.publish == 'true') }}
+    steps:
+      - name: Checkout code (for UPGRADE.md)
+        uses: actions/checkout@v4
+
+      - name: Download distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: distribution
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2 # Updated to v2
+        with:
+          tag_name: ${{ needs.build.outputs.tag }}
           body_path: UPGRADE.md
           files: |
-            build/distributions/*.zip
-            build/distributions/*.zip.sha256
+            IJava-${{ needs.build.outputs.tag }}.zip
+            IJava-${{ needs.build.outputs.tag }}.zip.sha256
+          prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(github.ref, '-rc') || contains(github.ref, '-pr') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2025 ${author}
+ * Copyright (c) 2025 ebpro
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -34,9 +34,10 @@ public class TimeItMagics {
     private final int epochs = 3;
     private final int loops = 5;
 
-    @CellMagic(aliases = {"time", "timeit"})
+    @CellMagic(aliases = { "time", "timeit" })
     public void timeIt(List<String> args, String body) throws Exception {
-        if (args == null) args = Collections.emptyList();
+        if (args == null)
+            args = Collections.emptyList();
 
         if (!args.isEmpty() && ("-h".equals(args.get(0)) || "--help".equals(args.get(0)))) {
             System.out.println("help: \nexample: \n");
@@ -44,39 +45,38 @@ public class TimeItMagics {
             return;
         }
 
-        // parse input args
+        // parse input args like epochs=3 loops=5 warmup=1 iterations=10
         Map<String, Integer> params = args.stream()
                 .map(arg -> arg.split("="))
-                .filter(kv -> kv.length > 0 && StringUtils.isNotEmpty(kv[0]) && StringUtils.isNotEmpty(kv[1]) && kv[1].matches("\\d+"))
+                .filter(kv -> kv.length > 1 && StringUtils.isNotEmpty(kv[0]) && StringUtils.isNotEmpty(kv[1])
+                        && kv[1].matches("\\d+"))
                 .collect(Collectors.toMap(kv -> kv[0], kv -> Integer.parseInt(kv[1])));
 
-        // for each epoch
-        Integer epochNum = params.getOrDefault("epochs", epochs);
-        Integer loopNum = params.getOrDefault("loops", loops);
-        List<List<Long>> epochData = new ArrayList<>(epochNum);
-        for (int i = 0; i < epochNum; i++) {
-            // for each loop
-            List<Long> loopData = new ArrayList<>(loopNum);
-            for (int j = 0; j < loopNum; j++) {
-                loopData.add(System.currentTimeMillis());
-                IJava.getKernelInstance().evalRaw(body);
-                loopData.add(System.currentTimeMillis());
-            }
-            epochData.add(loopData);
+        int warmup = Math.max(0, params.getOrDefault("warmup", 1));
+        int iterations = Math.max(1, params.getOrDefault("iterations", 5));
+
+        List<Long> samples = new ArrayList<>(iterations);
+
+        for (int w = 0; w < warmup; w++) {
+            IJava.getKernelInstance().evalRaw(body);
         }
 
-        // Summary Statistics
-        List<List<Long>> epochDiff = new ArrayList<>(epochData.size());
-        for (int i = 0; i < epochData.size(); i++) {
-            List<Long> loopData = epochData.get(i);
-            List<Long> diff = new ArrayList<>(loopData.size() / 2);
-            for (int j = 0; j < loopData.size() / 2; j++) {
-                diff.add(loopData.get(i * 2 + 1) - loopData.get(i * 2));
-            }
-            LongSummaryStatistics statistics = diff.stream().collect(Collectors.summarizingLong(o -> o));
-            System.out.printf("epoch %d: %s%n", i, statistics);
-            epochDiff.add(diff);
+        for (int i = 0; i < iterations; i++) {
+            long start = System.nanoTime();
+            IJava.getKernelInstance().evalRaw(body);
+            long end = System.nanoTime();
+            samples.add(end - start);
         }
-        System.out.printf("total: %s%n", epochDiff.stream().flatMap(Collection::stream).collect(Collectors.summarizingLong(o -> o)));
+
+        // compute statistics
+        long min = samples.stream().mapToLong(Long::longValue).min().orElse(0L);
+        long max = samples.stream().mapToLong(Long::longValue).max().orElse(0L);
+        double avg = samples.stream().mapToLong(Long::longValue).average().orElse(0.0);
+        List<Long> sorted = new ArrayList<>(samples);
+        Collections.sort(sorted);
+        long median = sorted.get(sorted.size() / 2);
+
+        System.out.printf("samples: %s\n", samples);
+        System.out.printf("min=%d median=%d avg=%.2f max=%d (nanoseconds)\n", min, median, avg, max);
     }
 }

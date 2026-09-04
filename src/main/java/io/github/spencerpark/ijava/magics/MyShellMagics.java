@@ -1,6 +1,6 @@
 package io.github.spencerpark.ijava.magics;
 
-import io.github.spencerpark.jupyter.kernel.magic.registry.CellMagic;
+// legacy file: no longer registers a magic
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
@@ -11,9 +11,10 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
+@Deprecated(forRemoval = true)
 public class MyShellMagics {
 
-    @CellMagic("myshell")
+    // No longer registers a magic. Use ShellMagics (%%shell) instead.
     public void myshell(List<String> args, String body) {
         if (args.isEmpty())
             return;

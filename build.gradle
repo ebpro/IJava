@@ -1,16 +1,16 @@
 plugins {
     id 'java-library'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
-    id 'io.github.gradle-nexus.publish-plugin' version '1.3.0'
+    id 'com.gradleup.shadow' version '9.6.1'
 }
 
 group = 'io.github.spencerpark'
-version = '1.4.5'
+// Allow overriding version from command line via `-Pversion=...`
+version = (gradle.startParameter.projectProperties.get('version') ?: '1.4.6').toString()
 
 // Java configuration
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
     withJavadocJar()
     withSourcesJar()
@@ -31,18 +31,24 @@ repositories {
 
 // Dependency versions
 def versions = [
-    jupyterKernel: '2.3.0',
     gson: '2.10.1',
     mavenResolver: '1.8.2',
     mavenProvider: '3.8.6',
     logback: '1.5.7',
-    junit: '4.13.2'
+    junit: '4.13.2',
+    lombok: '1.18.48'
 ]
 
-dependencies {
-    implementation("io.github.spencerpark:jupyter-jvm-basekernel:${versions.jupyterKernel}") {
-        exclude group: 'com.google.code.gson', module: 'gson'
+configurations.all {
+    resolutionStrategy {
+        force 'com.google.guava:guava:33.5.0-jre'
+        force 'com.google.guava:failureaccess:1.0.3'
+        force 'com.google.errorprone:error_prone_annotations:2.41.0'
     }
+}
+
+dependencies {
+    implementation project(':basekernel')
     implementation "com.google.code.gson:gson:${versions.gson}"
 
     // Maven resolver dependencies
@@ -57,17 +63,22 @@ dependencies {
 
     implementation "ch.qos.logback:logback-classic:${versions.logback}"
     testImplementation "junit:junit:${versions.junit}"
+    testImplementation 'com.h2database:h2:2.2.220'
 
     // JavaParser for Java source code analysis
     implementation 'com.github.javaparser:javaparser-core:3.25.8'
     implementation 'com.github.javaparser:javaparser-symbol-solver-core:3.25.8'
     // PlantUML for diagrams
-    implementation 'net.sourceforge.plantuml:plantuml:1.2024.1'
+    //implementation 'net.sourceforge.plantuml:plantuml:1.2024.1'
+    implementation('net.sourceforge.plantuml:plantuml:1.2026.0') {
+        transitive = false
+    }
+
     // ClassGraph for classpath scanning
     implementation 'io.github.classgraph:classgraph:4.8.168'
     // Lombok for annotations processing
-    compileOnly 'org.projectlombok:lombok:1.18.30'
-    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+    compileOnly "org.projectlombok:lombok:${versions.lombok}"
+    annotationProcessor "org.projectlombok:lombok:${versions.lombok}"
 }
 
 
@@ -76,13 +87,33 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs << '-parameters'
     options.deprecation = true
-    options.release = 21
+    options.release = 25
+}
+
+// Resource filtering
+def kernelProjectName = rootProject.name
+def kernelVersion = project.version
+processResources {
+    filesMatching(['ijava-kernel-metadata.json', 'kernel-metadata.json', 'kernel.json']) {
+        expand(
+            project: kernelProjectName,
+            version: kernelVersion
+        )
+    }
 }
 
 // Shadow JAR configuration
 shadowJar {
     archiveClassifier.set('all')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     mergeServiceFiles()
+    exclude 'module-info.class'
+    exclude 'META-INF/versions/*/module-info.class'
+    exclude 'META-INF/MANIFEST.MF'
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+    exclude 'META-INF/INDEX.LIST'
     manifest {
         attributes(
             'Main-Class': 'io.github.spencerpark.ijava.IJava',
@@ -104,7 +135,7 @@ tasks.register('packDist', Zip) {
     description = 'Creates distribution package'
     group = 'distribution'
 
-    archiveFileName = "${project.name}-latest.zip"
+    archiveFileName = "${project.name}-${project.version}.zip"
 
     from(layout.buildDirectory.dir("resources/main")) {
         include "install.py"

@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2025 ${author}
+ * Copyright (c) 2025 ebpro
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -47,6 +47,15 @@ public class IJavaExecutionControlProvider implements ExecutionControlProvider {
      */
     public static final String TIMEOUT_KEY = "timeout";
 
+    /**
+     * Default per-statement timeout applied when no {@value #TIMEOUT_KEY} parameter is
+     * configured. The {@code IJAVA_TIMEOUT} environment variable or the
+     * {@value #TIMEOUT_KEY} parameter can override this value. Set
+     * {@code IJAVA_TIMEOUT=-1} or {@code timeout=-1} to disable the timeout.
+     */
+    public static final long DEFAULT_TIMEOUT = 60;
+    public static final TimeUnit DEFAULT_TIMEOUT_UNIT = TimeUnit.SECONDS;
+
     private static final Pattern TIMEOUT_PATTERN = Pattern.compile("^(?<dur>-?\\d+)\\W*(?<unit>[A-Za-z]+)?$");
 
     private final Map<String, IJavaExecutionControl> controllers = new WeakHashMap<>();
@@ -62,8 +71,8 @@ public class IJavaExecutionControlProvider implements ExecutionControlProvider {
 
     @Override
     public ExecutionControl generate(ExecutionEnv env, Map<String, String> parameters) throws Throwable {
-        long timeout = -1;
-        TimeUnit timeUnit = TimeUnit.MILLISECONDS;
+        long timeout = DEFAULT_TIMEOUT;
+        TimeUnit timeUnit = DEFAULT_TIMEOUT_UNIT;
 
         String timeoutRaw = parameters.get(TIMEOUT_KEY);
         if (timeoutRaw != null) {

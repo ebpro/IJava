@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2025 ${author}
+ * Copyright (c) 2025 ebpro
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,10 @@ package io.github.spencerpark.ijava.magics;
 import io.github.spencerpark.jupyter.kernel.magic.registry.LineMagic;
 import io.github.spencerpark.jupyter.kernel.util.GlobFinder;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.StreamSupport;
@@ -40,6 +43,13 @@ public class ClasspathMagics {
 
     @LineMagic
     public List<String> jars(List<String> args) {
+        if (args == null) args = List.of();
+        if (args.contains("--help") || args.contains("-h")) {
+            System.out.println("## %jars - Add jar files to classpath\n\n" +
+                    "Usage: %jars [--help] <glob-pattern>...\n\n" +
+                    "Adds matching jar files to the kernel classpath and returns their paths.");
+            return List.of();
+        }
         List<String> jars = args.stream()
                 .map(GlobFinder::new)
                 .flatMap(g -> {
@@ -59,6 +69,11 @@ public class ClasspathMagics {
 
     @LineMagic
     public List<String> classpath(List<String> args) {
+        if (args == null) args = List.of();
+        if (args.contains("--help") || args.contains("-h")) {
+            System.out.println("## %classpath - Add paths to classpath\n\nUsage: %classpath [--help] <glob-pattern>...\n\nAdds matching paths to the kernel classpath and returns their paths.");
+            return List.of();
+        }
         List<String> paths = args.stream()
                 .map(GlobFinder::new)
                 .flatMap(g -> {
@@ -74,5 +89,31 @@ public class ClasspathMagics {
         paths.forEach(this.addToClasspath);
 
         return paths;
+    }
+
+    @LineMagic(value = "classpath-snapshot")
+    public String classpathSnapshot(List<String> args) {
+        if (args == null) args = List.of();
+        if (args.contains("--help") || args.contains("-h")) {
+            System.out.println("## %classpath-snapshot - Show current classpath\n\nUsage: %classpath-snapshot [--help]\n\nPrints the current java.class.path entries and returns them as a string.");
+            return "";
+        }
+        String cp = System.getProperty("java.class.path");
+        String[] parts = cp.split(File.pathSeparator);
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            sb.append(p);
+            try {
+                Path path = Path.of(p);
+                if (Files.exists(path)) {
+                    sb.append(" (lastModified=").append(Files.getLastModifiedTime(path)).append(")");
+                }
+            } catch (Exception ignored) {
+            }
+            sb.append("\n");
+        }
+        String out = sb.toString();
+        System.out.println(out);
+        return out;
     }
 }

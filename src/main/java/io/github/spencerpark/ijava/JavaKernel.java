@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2022 ${author}
+ * Copyright (c) 2022 ebpro
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -47,8 +47,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.codehaus.plexus.util.cli.shell.Shell;
-
 @Slf4j
 public class JavaKernel extends BaseKernel {
     public static String completeCodeSignifier() {
@@ -84,20 +82,21 @@ public class JavaKernel extends BaseKernel {
     private final StringStyler errorStyler;
 
     public static boolean printWithVarName = true;
-    // jupyter support ANSI_escape_code, java ansi code demo: https://stackoverflow.com/a/5762502
+    // jupyter support ANSI_escape_code, java ansi code demo:
+    // https://stackoverflow.com/a/5762502
     private static String varNamePattern = "\u001B[36m%s\u001B[0m: ";
     private Long snippetId = 0L;
     private static final List<String> COMMENT_PATTERNS = List.of("/\\*(.|\\s)*?\\*/", "//.*\\n*", "\\s+");
 
     public JavaKernel() {
         // todo for debug
-        //try {
-        //    System.out.println("------------- sleep start -------------");
-        //    Thread.sleep(10 * 1000L);
-        //    System.out.println("------------- sleep end -------------");
-        //} catch (InterruptedException e) {
-        //    e.printStackTrace();
-        //}
+        // try {
+        // System.out.println("------------- sleep start -------------");
+        // Thread.sleep(10 * 1000L);
+        // System.out.println("------------- sleep end -------------");
+        // } catch (InterruptedException e) {
+        // e.printStackTrace();
+        // }
         this.evaluator = new CodeEvaluatorBuilder()
                 .addClasspathFromString(System.getenv(IJava.CLASSPATH_KEY))
                 .compilerOptsFromString(System.getenv(IJava.COMPILER_OPTS_KEY))
@@ -119,14 +118,17 @@ public class JavaKernel extends BaseKernel {
         magics.registerMagics(new PrinterMagics());
         magics.registerMagics(new MagicsTool());
         magics.registerMagics(new TimeItMagics());
+        magics.registerMagics(new BenchmarkMagics());
         magics.registerMagics(new CompilerMagics(this::addToClasspath));
-
 
         magics.registerMagics(new JavaCompilerMagics(this::addToClasspath));
         magics.registerMagics(new JavaDBMSMagics());
         magics.registerMagics(new JavaMagics());
         magics.registerMagics(new JavaPlantUMLMagics());
-        magics.registerMagics(new MyShellMagics());
+        magics.registerMagics(new ClassDiagramMagics());
+        magics.registerMagics(new TableSchemaMagics());
+        magics.registerMagics(new GitMermaidMagics());
+        // Consolidated shell magics: `MyShellMagics` removed, use `ShellMagics` only.
         magics.registerMagics(new ShellMagics());
         try {
             magics.registerMagics(new SingleShellMagics());
@@ -146,13 +148,13 @@ public class JavaKernel extends BaseKernel {
                 IJava.VERSION,
                 Header.PROTOCOL_VERISON,
                 KERNEL_META.getOrDefault("project", "UNKNOWN"),
-                KERNEL_META.getOrDefault("version", "UNKNOWN")
-        );
+                KERNEL_META.getOrDefault("version", "UNKNOWN"));
         this.helpLinks = List.of(
-                new LanguageInfo.Help("Java tutorial", "https://docs.oracle.com/javase/tutorial/java/nutsandbolts/index.html"),
-                new LanguageInfo.Help("IJava homepage", "https://github.com/SpencerPark/IJava")
-        );
-        // todo io.github.spencerpark.jupyter.kernel.display.DisplayData putJSON, JsonParser.parseString
+                new LanguageInfo.Help("Java tutorial",
+                        "https://docs.oracle.com/javase/tutorial/java/nutsandbolts/index.html"),
+                new LanguageInfo.Help("IJava homepage", "https://github.com/SpencerPark/IJava"));
+        // todo io.github.spencerpark.jupyter.kernel.display.DisplayData putJSON,
+        // JsonParser.parseString
         this.renderer.createRegistration(JsonElement.class)
                 .preferring(MIMEType.APPLICATION_JSON)
                 .register((data, context) -> context.renderIfRequested(MIMEType.APPLICATION_JSON, () -> data));
@@ -162,7 +164,8 @@ public class JavaKernel extends BaseKernel {
                 .addSecondaryStyle(TextColor.BOLD_RED_FG)
                 .addHighlightStyle(TextColor.BOLD_BLACK_FG)
                 .addHighlightStyle(TextColor.RED_BG)
-                //TODO map snippet ids to code cells and put the proper line number in the margin here
+                // TODO map snippet ids to code cells and put the proper line number in the
+                // margin here
                 .withLinePrefix(TextColor.BOLD_BLACK_FG + "|   ")
                 .build();
     }
@@ -232,7 +235,8 @@ public class JavaKernel extends BaseKernel {
 
                     // Add the error message
                     for (String line : StringStyler.splitLines(d.getMessage(null))) {
-                        // Skip the information about the location of the error as it is highlighted instead
+                        // Skip the information about the location of the error as it is highlighted
+                        // instead
                         if (!line.trim().startsWith("location:"))
                             fmt.add(this.errorStyler.secondary(line));
                     }
@@ -275,7 +279,8 @@ public class JavaKernel extends BaseKernel {
     }
 
     private void formatUnresolvedDep(DeclarationSnippet declarationSnippet, final List<String> fmt) {
-        List<String> unresolvedDependencies = this.evaluator.getShell().unresolvedDependencies(declarationSnippet).toList();
+        List<String> unresolvedDependencies = this.evaluator.getShell().unresolvedDependencies(declarationSnippet)
+                .toList();
         if (!unresolvedDependencies.isEmpty()) {
             fmt.addAll(this.errorStyler.primaryLines(declarationSnippet.source()));
             fmt.add(this.errorStyler.secondary("Unresolved dependencies:"));
@@ -289,8 +294,7 @@ public class JavaKernel extends BaseKernel {
         fmt.add(this.errorStyler.secondary(String.format(
                 "Evaluation timed out after %d %s.",
                 e.getDuration(),
-                e.getUnit().name().toLowerCase())
-        ));
+                e.getUnit().name().toLowerCase())));
 
         return fmt;
     }
@@ -313,18 +317,23 @@ public class JavaKernel extends BaseKernel {
     public DisplayData eval(String expr) throws Exception {
         Object result = this.evalRaw(expr);
 
-        if (result == null) return null;
-        if (result instanceof DisplayData displayData) return displayData;
+        if (result == null)
+            return null;
+        if (result instanceof DisplayData displayData)
+            return displayData;
 
         if (printWithVarName) {
-            Optional<Snippet> lastSnippet = this.evaluator.getShell().snippets().skip(snippetId).reduce((first, second) -> second);
+            Optional<Snippet> lastSnippet = this.evaluator.getShell().snippets().skip(snippetId)
+                    .reduce((first, second) -> second);
             if (lastSnippet.isPresent()) {
                 Snippet snippet = lastSnippet.get();
                 if (snippet instanceof ExpressionSnippet || snippet instanceof VarSnippet) {
                     snippetId = snippet.id().matches("\\d+") ? (Long.parseLong(snippet.id()) - 1) : (snippetId + 1);
                     String sourceStr = snippet.source();
-                    for (String pattern : COMMENT_PATTERNS) sourceStr = sourceStr.replaceAll(pattern, "");
-                    if (sourceStr.length() > 32) sourceStr = sourceStr.substring(0, 32) + "...";
+                    for (String pattern : COMMENT_PATTERNS)
+                        sourceStr = sourceStr.replaceAll(pattern, "");
+                    if (sourceStr.length() > 32)
+                        sourceStr = sourceStr.substring(0, 32) + "...";
                     return this.getRenderer().render(String.format(varNamePattern, sourceStr) + result);
                 }
             }
@@ -335,17 +344,24 @@ public class JavaKernel extends BaseKernel {
 
     @Override
     public DisplayData inspect(String code, int at, boolean extraDetail) {
-        // Move the code position to the end of the identifier to make the inspection work at any
-        // point in the identifier. i.e "System.o|ut" or "System.out|" will return the same result.
-        while (at + 1 < code.length() && IDENTIFIER_CHAR.test(code.charAt(at + 1))) at++;
+        // Move the code position to the end of the identifier to make the inspection
+        // work at any
+        // point in the identifier. i.e "System.o|ut" or "System.out|" will return the
+        // same result.
+        while (at + 1 < code.length() && IDENTIFIER_CHAR.test(code.charAt(at + 1)))
+            at++;
 
-        // If the next non-whitespace character is an opening paren '(' then this must be included
+        // If the next non-whitespace character is an opening paren '(' then this must
+        // be included
         // in the documentation search to ensure it searches for a method call.
         int parenIdx = at;
-        while (parenIdx + 1 < code.length() && WS.test(code.charAt(parenIdx + 1))) parenIdx++;
-        if (parenIdx + 1 < code.length() && code.charAt(parenIdx + 1) == '(') at = parenIdx + 1;
+        while (parenIdx + 1 < code.length() && WS.test(code.charAt(parenIdx + 1)))
+            parenIdx++;
+        if (parenIdx + 1 < code.length() && code.charAt(parenIdx + 1) == '(')
+            at = parenIdx + 1;
 
-        List<SourceCodeAnalysis.Documentation> documentations = this.evaluator.getShell().sourceCodeAnalysis().documentation(code, at + 1, true);
+        List<SourceCodeAnalysis.Documentation> documentations = this.evaluator.getShell().sourceCodeAnalysis()
+                .documentation(code, at + 1, true);
         if (documentations == null || documentations.isEmpty()) {
             return null;
         }
@@ -356,11 +372,11 @@ public class JavaKernel extends BaseKernel {
                             String formatted = doc.signature();
 
                             String javadoc = doc.javadoc();
-                            if (javadoc != null) formatted += '\n' + javadoc;
+                            if (javadoc != null)
+                                formatted += '\n' + javadoc;
 
                             return formatted;
-                        }).collect(Collectors.joining("\n\n"))
-        );
+                        }).collect(Collectors.joining("\n\n")));
 
         fmtDocs.putHTML(
                 documentations.stream()
@@ -369,11 +385,11 @@ public class JavaKernel extends BaseKernel {
 
                             // TODO consider compiling the javadoc to html for pretty printing
                             String javadoc = doc.javadoc();
-                            if (javadoc != null) formatted += "<br/>" + javadoc;
+                            if (javadoc != null)
+                                formatted += "<br/>" + javadoc;
 
                             return formatted;
-                        }).collect(Collectors.joining("<br/><br/>"))
-        );
+                        }).collect(Collectors.joining("<br/><br/>")));
 
         return fmtDocs;
     }
@@ -381,10 +397,13 @@ public class JavaKernel extends BaseKernel {
     @Override
     public ReplacementOptions complete(String code, int at) {
         int[] replaceStart = new int[1]; // As of now this is always the same as the cursor...
-        List<SourceCodeAnalysis.Suggestion> suggestions = this.evaluator.getShell().sourceCodeAnalysis().completionSuggestions(code, at, replaceStart);
-        if (suggestions == null || suggestions.isEmpty()) return null;
+        List<SourceCodeAnalysis.Suggestion> suggestions = this.evaluator.getShell().sourceCodeAnalysis()
+                .completionSuggestions(code, at, replaceStart);
+        if (suggestions == null || suggestions.isEmpty())
+            return null;
 
-        //      .sorted((s1, s2) -> s1.matchesType() ? s2.matchesType() ? 0 : -1 : s2.matchesType() ? 1 : 0)
+        // .sorted((s1, s2) -> s1.matchesType() ? s2.matchesType() ? 0 : -1 :
+        // s2.matchesType() ? 1 : 0)
         List<String> options = suggestions.stream()
                 .sorted((s1, s2) -> (s1.matchesType() ? 0 : 1) + (s2.matchesType() ? 0 : -1))
                 .map(SourceCodeAnalysis.Suggestion::continuation)
@@ -402,6 +421,11 @@ public class JavaKernel extends BaseKernel {
     @Override
     public void onShutdown(boolean isRestarting) {
         this.evaluator.shutdown();
+        try {
+            io.github.spencerpark.ijava.magics.ShellMagics.shutdownExecutor();
+        } catch (Throwable t) {
+            log.warn("Failed to shutdown ShellMagics executor", t);
+        }
     }
 
     @Override
