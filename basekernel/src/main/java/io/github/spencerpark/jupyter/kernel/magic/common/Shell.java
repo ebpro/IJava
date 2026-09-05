@@ -25,6 +25,7 @@ public class Shell {
             p.waitFor();
         } catch (InterruptedException e) {
             p.destroy();
+            Thread.currentThread().interrupt();
         }
 
         return output;

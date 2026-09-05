@@ -80,7 +80,7 @@ public class JupyterInputStream extends InputStream {
             }
         }
 
-        return this.data[this.bufferPos++];
+        return this.data[this.bufferPos++] & 0xFF;
     }
 
     @Override

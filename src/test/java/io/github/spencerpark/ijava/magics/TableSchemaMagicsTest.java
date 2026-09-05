@@ -61,6 +61,12 @@ public class TableSchemaMagicsTest {
     }
 
     @Test
+    public void invalidSchemaNameDisplaysError() {
+        new TableSchemaMagics().tableSchema(List.of("bad-schema.valid_table"));
+        Assert.assertTrue(kernel.displayedTexts().stream().anyMatch(text -> text.contains("Invalid table name")));
+    }
+
+    @Test
     public void noConnectionDisplaysMessage() {
         new TableSchemaMagics().tableSchema(List.of("valid_table"));
         Assert.assertTrue(kernel.displayedTexts().stream().anyMatch(text -> text.contains("No JDBC connection available.")));

@@ -100,7 +100,9 @@ public class ShellChannel extends JupyterSocket {
         if (this.ioloop != null) {
             try {
                 this.ioloop.join();
-            } catch (InterruptedException ignored) { }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }

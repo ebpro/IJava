@@ -33,7 +33,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
+import java.util.stream.Stream;
 
 public class FileUtils {
     private FileUtils() {
@@ -82,5 +85,38 @@ public class FileUtils {
             }
         });
         return matchedPath;
+    }
+
+    public static Path createPrivateTempDir(String prefix) throws IOException {
+        try {
+            FileAttribute<?> dirAttr = PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
+            return Files.createTempDirectory(prefix, dirAttr);
+        } catch (UnsupportedOperationException e) {
+            return Files.createTempDirectory(prefix);
+        }
+    }
+
+    public static Path createPrivateTempFile(Path directory, String prefix, String suffix) throws IOException {
+        try {
+            FileAttribute<?> fileAttr = PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"));
+            return Files.createTempFile(directory, prefix, suffix, fileAttr);
+        } catch (UnsupportedOperationException e) {
+            return Files.createTempFile(directory, prefix, suffix);
+        }
+    }
+
+    public static void deleteRecursively(Path root) {
+        if (root == null || !Files.exists(root)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(root)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException ignored) {
+                }
+            });
+        } catch (IOException ignored) {
+        }
     }
 }

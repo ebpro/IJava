@@ -103,39 +103,37 @@ public class DBMetadataInspector {
 
         // constraints (information_schema best-effort)
         try {
-            String qc;
-            PreparedStatement ps;
-            if (schema != null) {
-                qc = "SELECT constraint_name, constraint_type FROM information_schema.table_constraints WHERE table_schema = ? AND table_name = ?";
-                ps = conn.prepareStatement(qc);
-                ps.setString(1, schema);
-                ps.setString(2, table);
-            } else {
-                qc = "SELECT constraint_name, constraint_type FROM information_schema.table_constraints WHERE table_name = ?";
-                ps = conn.prepareStatement(qc);
-                ps.setString(1, table);
-            }
-            try (ResultSet cr = ps.executeQuery()) {
-                while (cr.next()) meta.constraints.add(cr.getString("constraint_name") + ": " + cr.getString("constraint_type"));
+            String qc = schema != null
+                    ? "SELECT constraint_name, constraint_type FROM information_schema.table_constraints WHERE table_schema = ? AND table_name = ?"
+                    : "SELECT constraint_name, constraint_type FROM information_schema.table_constraints WHERE table_name = ?";
+            try (PreparedStatement ps = conn.prepareStatement(qc)) {
+                if (schema != null) {
+                    ps.setString(1, schema);
+                    ps.setString(2, table);
+                } else {
+                    ps.setString(1, table);
+                }
+                try (ResultSet cr = ps.executeQuery()) {
+                    while (cr.next()) meta.constraints.add(cr.getString("constraint_name") + ": " + cr.getString("constraint_type"));
+                }
             }
         } catch (Throwable ignored) { }
 
         // check constraints
         try {
-            String qc;
-            PreparedStatement ps;
-            if (schema != null) {
-                qc = "SELECT cc.constraint_name, cc.check_clause FROM information_schema.check_constraints cc JOIN information_schema.table_constraints tc ON cc.constraint_name = tc.constraint_name WHERE tc.table_schema = ? AND tc.table_name = ?";
-                ps = conn.prepareStatement(qc);
-                ps.setString(1, schema);
-                ps.setString(2, table);
-            } else {
-                qc = "SELECT cc.constraint_name, cc.check_clause FROM information_schema.check_constraints cc JOIN information_schema.table_constraints tc ON cc.constraint_name = tc.constraint_name WHERE tc.table_name = ?";
-                ps = conn.prepareStatement(qc);
-                ps.setString(1, table);
-            }
-            try (ResultSet cr = ps.executeQuery()) {
-                while (cr.next()) meta.checks.add(cr.getString("constraint_name") + ": " + cr.getString("check_clause"));
+            String qc = schema != null
+                    ? "SELECT cc.constraint_name, cc.check_clause FROM information_schema.check_constraints cc JOIN information_schema.table_constraints tc ON cc.constraint_name = tc.constraint_name WHERE tc.table_schema = ? AND tc.table_name = ?"
+                    : "SELECT cc.constraint_name, cc.check_clause FROM information_schema.check_constraints cc JOIN information_schema.table_constraints tc ON cc.constraint_name = tc.constraint_name WHERE tc.table_name = ?";
+            try (PreparedStatement ps = conn.prepareStatement(qc)) {
+                if (schema != null) {
+                    ps.setString(1, schema);
+                    ps.setString(2, table);
+                } else {
+                    ps.setString(1, table);
+                }
+                try (ResultSet cr = ps.executeQuery()) {
+                    while (cr.next()) meta.checks.add(cr.getString("constraint_name") + ": " + cr.getString("check_clause"));
+                }
             }
         } catch (Throwable ignored) { }
 

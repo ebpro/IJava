@@ -158,6 +158,7 @@ public class ShellMagics {
             log.error("Error while running shell command", e);
             throw e;
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             log.error("Error while waiting for process to finish", e);
             throw e;
         }

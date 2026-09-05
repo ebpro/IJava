@@ -80,7 +80,9 @@ public class HeartbeatChannel extends JupyterSocket {
         if (this.pulse != null) {
             try {
                 this.pulse.join();
-            } catch (InterruptedException ignored) { }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }

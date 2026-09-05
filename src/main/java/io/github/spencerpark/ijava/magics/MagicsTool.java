@@ -45,6 +45,7 @@ import java.util.Optional;
 import java.util.Arrays;
 import java.net.URL;
 import io.github.spencerpark.ijava.runtime.Display;
+import io.github.spencerpark.ijava.utils.FileUtils;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -341,9 +342,13 @@ public class MagicsTool {
 
     @CellMagic(value = "write")
     public void writeToFile(List<String> args, String body) throws IOException {
-        String fileName = args.isEmpty()
-                ? Files.createTempFile("jshell-", ".tmp").toAbsolutePath().toString()
-                : args.get(0);
+        String fileName;
+        if (args.isEmpty()) {
+            Path tempDir = FileUtils.createPrivateTempDir("ijava-jshell-");
+            fileName = FileUtils.createPrivateTempFile(tempDir, "jshell-", ".tmp").toAbsolutePath().toString();
+        } else {
+            fileName = args.get(0);
+        }
         File file = new File(fileName);
         if (file.getParentFile() != null && !file.getParentFile().exists() && !file.getParentFile().mkdirs())
             throw new IOException("Cannot create parent folder: " + file.getParentFile());

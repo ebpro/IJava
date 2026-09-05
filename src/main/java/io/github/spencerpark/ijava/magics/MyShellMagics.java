@@ -45,6 +45,7 @@ public class MyShellMagics {
             }
 
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             log.error("Error while waiting for process to finish", e);
             e.printStackTrace();
         } catch (IOException e) {

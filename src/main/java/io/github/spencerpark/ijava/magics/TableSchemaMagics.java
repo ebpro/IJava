@@ -117,8 +117,8 @@ public class TableSchemaMagics {
             table = tableArg.substring(idx + 1);
         }
 
-        // Security: only allow alphanumeric + underscore for table
-        if (!table.matches("[\\w]+")) {
+        // Security: only allow alphanumeric + underscore for schema and table identifiers
+        if ((schema != null && !schema.matches("[\\w]+")) || !table.matches("[\\w]+")) {
             Display.display("Invalid table name: " + tableArg, "text/plain");
             return;
         }
@@ -259,9 +259,9 @@ public class TableSchemaMagics {
 
             // --------------------- SAMPLE ROWS ---------------------
             if (sampleRows != null && sampleRows > 0) {
-                try (Statement s = conn.createStatement()) {
-                    String sql = "SELECT * FROM " + tableArg + " LIMIT " + sampleRows;
-                    try (ResultSet rs = s.executeQuery(sql)) {
+                try (PreparedStatement s = conn.prepareStatement("SELECT * FROM " + tableArg + " LIMIT ?")) {
+                    s.setInt(1, sampleRows);
+                    try (ResultSet rs = s.executeQuery()) {
                         StringBuilder tbl = new StringBuilder();
                         ResultSetMetaData rm = rs.getMetaData();
                         int nc = rm.getColumnCount();

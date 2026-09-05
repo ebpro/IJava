@@ -91,6 +91,7 @@ public class Loop extends Thread {
                 try {
                     Thread.sleep(sleep);
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     this.logger.info("Loop interrupted. Stopping...");
                     this.running = false;
                 }

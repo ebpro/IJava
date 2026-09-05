@@ -1,10 +1,12 @@
 package io.github.spencerpark.ijava.magics;
 
 import io.github.spencerpark.ijava.runtime.Display;
+import io.github.spencerpark.ijava.utils.FileUtils;
 import io.github.spencerpark.jupyter.kernel.magic.registry.LineMagic;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 
 /**
@@ -214,36 +216,39 @@ public class GitMermaidMagics {
 
         // Attempt to render via mmdc if requested
         try {
-            File tmpMmd = Files.createTempFile("git-graph-", ".mmd").toFile();
-            File outSvg = Files.createTempFile("git-graph-", ".svg").toFile();
-            // write mermaid source without fences
-            StringBuilder raw = new StringBuilder();
-            raw.append("flowchart TD\n");
-            for (Map.Entry<String,String> e : labelByShort.entrySet()) {
-                raw.append("c").append(e.getKey()).append("[\"").append(escapeForMermaid(e.getValue())).append("\"]\n");
-            }
-            for (Map.Entry<String,Set<String>> e : edges.entrySet()) {
-                for (String p : e.getValue()) {
-                    raw.append("c").append(e.getKey()).append(" --> c").append(p).append("\n");
+            Path tempDir = FileUtils.createPrivateTempDir("ijava-git-graph-");
+            File tmpMmd = FileUtils.createPrivateTempFile(tempDir, "git-graph-", ".mmd").toFile();
+            File outSvg = FileUtils.createPrivateTempFile(tempDir, "git-graph-", ".svg").toFile();
+            try {
+                // write mermaid source without fences
+                StringBuilder raw = new StringBuilder();
+                raw.append("flowchart TD\n");
+                for (Map.Entry<String,String> e : labelByShort.entrySet()) {
+                    raw.append("c").append(e.getKey()).append("[\"").append(escapeForMermaid(e.getValue())).append("\"]\n");
                 }
-            }
-            Files.writeString(tmpMmd.toPath(), raw.toString());
+                for (Map.Entry<String,Set<String>> e : edges.entrySet()) {
+                    for (String p : e.getValue()) {
+                        raw.append("c").append(e.getKey()).append(" --> c").append(p).append("\n");
+                    }
+                }
+                Files.writeString(tmpMmd.toPath(), raw.toString());
 
-            List<String> renderCmd = new ArrayList<>();
-            renderCmd.add("mmdc");
-            renderCmd.add("-i"); renderCmd.add(tmpMmd.getAbsolutePath());
-            renderCmd.add("-o"); renderCmd.add(outSvg.getAbsolutePath());
+                List<String> renderCmd = new ArrayList<>();
+                renderCmd.add("mmdc");
+                renderCmd.add("-i"); renderCmd.add(tmpMmd.getAbsolutePath());
+                renderCmd.add("-o"); renderCmd.add(outSvg.getAbsolutePath());
 
-            String rc = runCommand(renderCmd);
-            if (outSvg.exists()) {
-                String svg = Files.readString(outSvg.toPath());
-                Display.display(svg, "image/svg+xml");
-                tmpMmd.delete(); outSvg.delete();
-                return;
-            } else {
-                Display.display(mermaidBlock + "\n\n(Note: failed to render with mmdc; ensure mermaid-cli is installed)", "text/markdown");
-                tmpMmd.delete();
-                return;
+                runCommand(renderCmd);
+                if (outSvg.exists()) {
+                    String svg = Files.readString(outSvg.toPath());
+                    Display.display(svg, "image/svg+xml");
+                    return;
+                } else {
+                    Display.display(mermaidBlock + "\n\n(Note: failed to render with mmdc; ensure mermaid-cli is installed)", "text/markdown");
+                    return;
+                }
+            } finally {
+                FileUtils.deleteRecursively(tempDir);
             }
         } catch (Throwable t) {
             Display.display(mermaidBlock + "\n\n(Note: rendering failed: " + t.getMessage() + ")", "text/markdown");
