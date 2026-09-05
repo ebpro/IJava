@@ -2,6 +2,7 @@ import org.apache.tools.ant.filters.ReplaceTokens
 
 plugins {
     id 'java-library'
+    id 'jacoco'
 }
 
 group = 'io.github.spencerpark'
@@ -45,6 +46,19 @@ processResources {
     filter ReplaceTokens, tokens: tokens
 }
 
+jacoco {
+    toolVersion = '0.8.15'
+}
+
 test {
     useJUnit()
+    finalizedBy jacocoTestReport
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
