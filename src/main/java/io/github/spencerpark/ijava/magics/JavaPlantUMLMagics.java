@@ -88,37 +88,35 @@ public class JavaPlantUMLMagics {
         List<String> safeArgs = args == null ? List.of() : args;
         if (safeArgs.size() > 1)
             throw new IllegalArgumentException("Max one argument : SVG or PNG");
-        String fileFormat;
-        if (safeArgs.isEmpty())
-            fileFormat = "SVG";
-        else
-            fileFormat = safeArgs.get(0);
+        String fileFormat = safeArgs.isEmpty() ? "SVG" : safeArgs.get(0);
 
         List<Object> outList = new ArrayList<>();
         if (body == null)
             return;
-        body.lines().forEach(filename -> {
-            try {
-                Object out = cellMagic("plantUML", args, Files.readString(Paths.get(filename)));
-                // The invoked cell magic may perform its own display and return null; only
-                // display non-null results.
-                if (out != null) {
-                    outList.add(out);
-                    display(out, fileFormat.equals("SVG") ? "image/svg+xml" : "image/png");
-                }
-            } catch (java.io.IOException e) {
-                log.error("Error reading PlantUML file", e);
-                throw new RuntimeException(e);
-            } catch (RuntimeException e) {
-                // Bubble up with context to help debugging
-                log.error("Error running plantUML magic for file {}", filename, e);
-                throw new RuntimeException("Error running plantUML magic for file " + filename + ": " + e.getMessage(),
-                        e);
-            }
-        });
+        body.lines().forEach(filename -> renderFile(filename, args, fileFormat, outList));
         // if caller expects a combined representation, nothing to return here; outputs
         // have been displayed
 
+    }
+
+    private void renderFile(String filename, List<String> args, String fileFormat, List<Object> outList) {
+        try {
+            Object out = cellMagic("plantUML", args, Files.readString(Paths.get(filename)));
+            // The invoked cell magic may perform its own display and return null; only
+            // display non-null results.
+            if (out != null) {
+                outList.add(out);
+                display(out, fileFormat.equals("SVG") ? "image/svg+xml" : "image/png");
+            }
+        } catch (IOException e) {
+            log.error("Error reading PlantUML file", e);
+            throw new RuntimeException(e);
+        } catch (RuntimeException e) {
+            // Bubble up with context to help debugging
+            log.error("Error running plantUML magic for file {}", filename, e);
+            throw new RuntimeException("Error running plantUML magic for file " + filename + ": " + e.getMessage(),
+                    e);
+        }
     }
 
 }

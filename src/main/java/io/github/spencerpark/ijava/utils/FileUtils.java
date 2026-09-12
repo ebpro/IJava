@@ -88,12 +88,22 @@ public class FileUtils {
     }
 
     public static Path createPrivateTempDir(String prefix) throws IOException {
+        Path baseDir = privateTempBaseDir();
         try {
             FileAttribute<?> dirAttr = PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
-            return Files.createTempDirectory(prefix, dirAttr);
+            return Files.createTempDirectory(baseDir, prefix, dirAttr);
         } catch (UnsupportedOperationException e) {
-            return Files.createTempDirectory(prefix);
+            return Files.createTempDirectory(baseDir, prefix);
         }
+    }
+
+    private static Path privateTempBaseDir() throws IOException {
+        Path baseDir = Paths.get(System.getProperty("java.io.tmpdir"), "ijava-private");
+        Files.createDirectories(baseDir);
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+            Files.setPosixFilePermissions(baseDir, PosixFilePermissions.fromString("rwx------"));
+        }
+        return baseDir;
     }
 
     public static Path createPrivateTempFile(Path directory, String prefix, String suffix) throws IOException {
@@ -111,12 +121,14 @@ public class FileUtils {
         }
         try (Stream<Path> paths = Files.walk(root)) {
             paths.sorted(Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (IOException ignored) {
-                }
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException ignored) {
+                // best-effort cleanup: skip files that cannot be deleted
+            }
             });
         } catch (IOException ignored) {
+            // best-effort cleanup: ignore traversal failures
         }
     }
 }

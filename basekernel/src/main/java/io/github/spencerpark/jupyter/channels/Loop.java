@@ -2,6 +2,7 @@ package io.github.spencerpark.jupyter.channels;
 
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 import java.util.function.ToLongFunction;
 import java.util.logging.Logger;
@@ -12,8 +13,8 @@ public class Loop extends Thread {
     private volatile boolean running = false;
     private final LongSupplier loopBody;
 
-    private volatile Runnable onCloseCb;
-    private volatile ToLongFunction<Throwable> onErrorCb;
+    private final AtomicReference<Runnable> onCloseCb = new AtomicReference<>();
+    private final AtomicReference<ToLongFunction<Throwable>> onErrorCb = new AtomicReference<>();
     private final Queue<Runnable> runNextQueue;
 
     public Loop(String name, long sleep, Runnable target) {
@@ -34,34 +35,30 @@ public class Loop extends Thread {
     }
 
     public void onClose(Runnable callback) {
-        if (this.onCloseCb != null) {
-            Runnable oldCallback = this.onCloseCb;
-            this.onCloseCb = () -> {
-                oldCallback.run();
-                callback.run();
-            };
-        } else {
-            this.onCloseCb = callback;
-        }
+        this.onCloseCb.updateAndGet(old -> old == null
+                ? callback
+                : () -> {
+                    old.run();
+                    callback.run();
+                });
     }
 
     public void onError(ToLongFunction<Throwable> callback) {
-        if (this.onErrorCb == null) {
-            this.onErrorCb = callback;
-            return;
-        }
+        this.onErrorCb.updateAndGet(old -> {
+            if (old == null)
+                return callback;
 
-        // Adding a second handler will only be invoked if the
-        // previous one throws (or rethrows) the incoming exception.
-        // The callback is invoked with the rethrown exception.
-        ToLongFunction<Throwable> oldCallback = this.onErrorCb;
-        this.onErrorCb = t -> {
-            try {
-                return oldCallback.applyAsLong(t);
-            } catch (Throwable tPrime) {
-                return callback.applyAsLong(tPrime);
-            }
-        };
+            // Adding a second handler will only be invoked if the
+            // previous one throws (or rethrows) the incoming exception.
+            // The callback is invoked with the rethrown exception.
+            return t -> {
+                try {
+                    return old.applyAsLong(t);
+                } catch (Throwable tPrime) {
+                    return callback.applyAsLong(tPrime);
+                }
+            };
+        });
     }
 
     public void doNext(Runnable next) {
@@ -70,7 +67,6 @@ public class Loop extends Thread {
 
     @Override
     public void run() {
-        Runnable next;
         while (this.running) {
             long sleep;
             try {
@@ -78,11 +74,11 @@ public class Loop extends Thread {
                 sleep = this.loopBody.getAsLong();
 
                 // Run all queued tasks
-                while ((next = this.runNextQueue.poll()) != null)
-                    next.run();
+                this.runQueuedTasks();
             } catch (Throwable t) {
-                if (this.onErrorCb != null)
-                    sleep = this.onErrorCb.applyAsLong(t);
+                ToLongFunction<Throwable> errorHandler = this.onErrorCb.get();
+                if (errorHandler != null)
+                    sleep = errorHandler.applyAsLong(t);
                 else
                     throw t;
             }
@@ -103,11 +99,18 @@ public class Loop extends Thread {
 
         this.logger.info("Running loop shutdown callback.");
 
-        if (this.onCloseCb != null)
-            this.onCloseCb.run();
-        this.onCloseCb = null;
+        Runnable closeCallback = this.onCloseCb.get();
+        if (closeCallback != null)
+            closeCallback.run();
+        this.onCloseCb.set(null);
 
         this.logger.info("Loop stopped.");
+    }
+
+    private void runQueuedTasks() {
+        Runnable next;
+        while ((next = this.runNextQueue.poll()) != null)
+            next.run();
     }
 
     @Override

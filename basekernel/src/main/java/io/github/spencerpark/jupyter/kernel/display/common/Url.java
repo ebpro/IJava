@@ -10,8 +10,12 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Url {
+    private static final Logger LOGGER = Logger.getLogger(Url.class.getName());
+
     public static String EMBED_KEY = "embed";
     public static String HTML_TAG_KEY = "url.html.tag";
     public static String HTML_SRC_ATTR_KEY = "url.html.src-attr";
@@ -32,7 +36,7 @@ public class Url {
                 DisplayData rendered = context.getRenderer().render(content, context.getParams());
                 context.getOutputContainer().assign(rendered);
             } catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.log(Level.FINE, "Failed to embed URL content for " + url, e);
             }
         } else {
             context.renderIfRequested(MIMEType.TEXT_HTML, () -> {

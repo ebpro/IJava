@@ -6,6 +6,7 @@ import org.zeromq.SocketType;
 import org.zeromq.ZMQ;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -15,7 +16,7 @@ public class HeartbeatChannel extends JupyterSocket {
     private static final AtomicInteger HEARTBEAT_ID = new AtomicInteger();
 
     private final long sleep;
-    private volatile Loop pulse;
+    private final AtomicReference<Loop> pulse = new AtomicReference<>();
 
     public HeartbeatChannel(ZMQ.Context context, HMACGenerator hmacGenerator, long sleep) {
         super(context, SocketType.REP, hmacGenerator, Logger.getLogger("HeartbeatChannel"));
@@ -27,7 +28,7 @@ public class HeartbeatChannel extends JupyterSocket {
     }
 
     private boolean isBound() {
-        return this.pulse != null;
+        return this.pulse.get() != null;
     }
 
     @Override
@@ -44,7 +45,7 @@ public class HeartbeatChannel extends JupyterSocket {
         ZMQ.Poller poller = super.ctx.poller(1);
         poller.register(this, ZMQ.Poller.POLLIN);
 
-        this.pulse = new Loop(channelThreadName, this.sleep, () -> {
+        Loop pulse = new Loop(channelThreadName, this.sleep, () -> {
             int events = poller.poll(0);
             if (events > 0) {
                 byte[] msg = this.recv();
@@ -59,27 +60,31 @@ public class HeartbeatChannel extends JupyterSocket {
                 super.logger.log(Level.FINEST, "Heartbeat pulse");
             }
         });
-        this.pulse.onClose(() -> {
+        this.pulse.set(pulse);
+
+        pulse.onClose(() -> {
             logger.log(Level.INFO, channelThreadName + " shutdown.");
-            this.pulse = null;
+            this.pulse.set(null);
         });
-        this.pulse.start();
+        pulse.start();
         logger.log(Level.INFO, "Polling on " + channelThreadName);
     }
 
     @Override
     public void close() {
-        if (this.isBound())
-            this.pulse.shutdown();
+        Loop pulse = this.pulse.get();
+        if (pulse != null)
+            pulse.shutdown();
 
         super.close();
     }
 
     @Override
     public void waitUntilClose() {
-        if (this.pulse != null) {
+        Loop pulse = this.pulse.get();
+        if (pulse != null) {
             try {
-                this.pulse.join();
+                pulse.join();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }

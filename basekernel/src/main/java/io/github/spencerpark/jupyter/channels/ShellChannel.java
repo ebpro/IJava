@@ -7,6 +7,7 @@ import org.zeromq.SocketType;
 import org.zeromq.ZMQ;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -14,7 +15,7 @@ public class ShellChannel extends JupyterSocket {
     private static final long SHELL_DEFAULT_LOOP_SLEEP_MS = 50;
     private static final AtomicInteger SHELL_ID = new AtomicInteger();
 
-    private volatile Loop ioloop;
+    private final AtomicReference<Loop> ioloop = new AtomicReference<>();
 
     private final boolean isControl;
     private final JupyterConnection connection;
@@ -32,7 +33,7 @@ public class ShellChannel extends JupyterSocket {
     }
 
     private boolean isBound() {
-        return this.ioloop != null;
+        return this.ioloop.get() != null;
     }
 
     @Override
@@ -51,7 +52,7 @@ public class ShellChannel extends JupyterSocket {
         ZMQ.Poller poller = super.ctx.poller(1);
         poller.register(this, ZMQ.Poller.POLLIN);
 
-        this.ioloop = new Loop(channelThreadName, this.sleep, () -> {
+        Loop loop = new Loop(channelThreadName, this.sleep, () -> {
             int events = poller.poll(0);
             if (events > 0) {
                 Message message = super.readMessage();
@@ -77,29 +78,33 @@ public class ShellChannel extends JupyterSocket {
             }
         });
 
-        this.ioloop.onClose(() -> {
+        this.ioloop.set(loop);
+
+        loop.onClose(() -> {
             logger.log(Level.INFO, channelThreadName + " shutdown.");
-            this.ioloop = null;
+            this.ioloop.set(null);
         });
 
-        this.ioloop.start();
+        loop.start();
 
         logger.log(Level.INFO, "Polling on " + channelThreadName);
     }
 
     @Override
     public void close() {
-        if (this.isBound())
-            this.ioloop.shutdown();
+        Loop loop = this.ioloop.get();
+        if (loop != null)
+            loop.shutdown();
 
         super.close();
     }
 
     @Override
     public void waitUntilClose() {
-        if (this.ioloop != null) {
+        Loop loop = this.ioloop.get();
+        if (loop != null) {
             try {
-                this.ioloop.join();
+                loop.join();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }

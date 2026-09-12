@@ -4,6 +4,7 @@ package io.github.spencerpark.ijava.magics;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Arrays;
@@ -22,7 +23,13 @@ public class MyShellMagics {
         log.info("Running shell command: {}", body);
         System.out.println("--> Running shell command: " + body);
 
-        String[] commands = { "zsh", "-c", body };
+        String zsh = resolveZsh();
+        if (zsh == null) {
+            log.error("No fixed zsh executable found in {}, refusing to run shell command", Arrays.toString(ZSH_CANDIDATES));
+            return;
+        }
+
+        String[] commands = { zsh, "-c", body };
         System.out.println("----> Running shell command: " + Arrays.toString(commands));
         try {
             Process proc = Runtime.getRuntime().exec(commands);
@@ -47,10 +54,24 @@ public class MyShellMagics {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("Error while waiting for process to finish", e);
-            e.printStackTrace();
         } catch (IOException e) {
             log.error("Error while running shell command", e);
 
         }
+    }
+
+    static final String[] ZSH_CANDIDATES = { "/bin/zsh", "/usr/bin/zsh", "/usr/local/bin/zsh" };
+
+    static String resolveZsh() {
+        return resolveZsh(ZSH_CANDIDATES);
+    }
+
+    static String resolveZsh(String[] candidates) {
+        for (String candidate : candidates) {
+            File file = new File(candidate);
+            if (file.isFile() && file.canExecute())
+                return candidate;
+        }
+        return null;
     }
 }

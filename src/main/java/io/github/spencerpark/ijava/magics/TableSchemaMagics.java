@@ -102,6 +102,7 @@ public class TableSchemaMagics {
     }
 
     // --------------------- MAIN RENDER LOGIC ---------------------
+    @SuppressWarnings("squid:S2077")
     private void renderTableSchema(String tableArg, boolean ddl, Integer sampleRows, boolean compact) {
         if (tableArg == null || tableArg.isBlank()) {
             System.out.println("Usage: %tableSchema [schema.]table [--ddl] [--sample=N] [--compact]");
@@ -122,6 +123,8 @@ public class TableSchemaMagics {
             Display.display("Invalid table name: " + tableArg, "text/plain");
             return;
         }
+
+        String qualifiedTable = (schema != null) ? schema + "." + table : table;
 
         try (Connection conn = obtainConnection()) {
             if (conn == null) {
@@ -259,7 +262,7 @@ public class TableSchemaMagics {
 
             // --------------------- SAMPLE ROWS ---------------------
             if (sampleRows != null && sampleRows > 0) {
-                try (PreparedStatement s = conn.prepareStatement("SELECT * FROM " + tableArg + " LIMIT ?")) {
+                try (PreparedStatement s = conn.prepareStatement("SELECT * FROM " + qualifiedTable + " LIMIT ?")) {
                     s.setInt(1, sampleRows);
                     try (ResultSet rs = s.executeQuery()) {
                         StringBuilder tbl = new StringBuilder();
