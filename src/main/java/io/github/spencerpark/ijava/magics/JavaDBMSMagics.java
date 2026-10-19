@@ -556,7 +556,7 @@ public class JavaDBMSMagics {
 
                         // default: HTML
                         StringBuilder html = new StringBuilder();
-                        html.append("<table border=1 style=\"border-collapse:collapse; width:100%;\">\n<thead><tr>");
+                        html.append("<table class=\"ijava-db-table\" border=1 style=\"border-collapse:collapse; width:100%;\">\n<thead><tr>");
                         for (int i = 1; i <= cols; i++)
                             html.append("<th style=\"text-align:left; padding:4px;\">")
                                     .append(escapeHtml(md.getColumnLabel(i))).append("</th>");
@@ -623,7 +623,7 @@ public class JavaDBMSMagics {
                                     break;
                                 } else {
                                     StringBuilder html = new StringBuilder();
-                                    html.append("<table border=1 style=\"border-collapse:collapse; width:100%;\">\n<thead><tr>");
+                                    html.append("<table class=\"ijava-db-table\" border=1 style=\"border-collapse:collapse; width:100%;\">\n<thead><tr>");
                                     for (int i = 1; i <= cols; i++)
                                         html.append("<th style=\"text-align:left; padding:4px;\">")
                                                 .append(escapeHtml(md.getColumnLabel(i))).append("</th>");
