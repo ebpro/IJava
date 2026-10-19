@@ -53,8 +53,32 @@ public class DBMetadataInspector {
         TableMetadata meta = new TableMetadata(schema, table);
         DatabaseMetaData md = conn.getMetaData();
 
+        // Case-tolerant identifier filter resolution. JDBC metadata lookups match
+        // schema/table filters EXACTLY (no case folding). Unquoted identifiers are
+        // stored UPPERCASE by H2 v2 and other SQL-standard-compliant databases but
+        // natively lowercase by postgres; a filter in the wrong case silently yields
+        // an empty metadata set. Probe as-given first -- when it already matches
+        // (postgres and any correctly-cased call) behavior and ordering are
+        // unchanged -- then retry UPPER, then lower. The display names recorded in
+        // `meta` intentionally keep the as-given values.
+        String fSchema = schema;
+        String fTable = table;
+        if (table != null && !hasColumns(md, schema, table)) {
+            String[][] candidates = {
+                {schema == null ? null : schema.toUpperCase(Locale.ROOT), table.toUpperCase(Locale.ROOT)},
+                {schema == null ? null : schema.toLowerCase(Locale.ROOT), table.toLowerCase(Locale.ROOT)},
+            };
+            for (String[] cand : candidates) {
+                if (hasColumns(md, cand[0], cand[1])) {
+                    fSchema = cand[0];
+                    fTable = cand[1];
+                    break;
+                }
+            }
+        }
+
         // columns
-        try (ResultSet cols = md.getColumns(null, schema, table, null)) {
+        try (ResultSet cols = md.getColumns(null, fSchema, fTable, null)) {
             while (cols.next()) {
                 String name = cols.getString("COLUMN_NAME");
                 String type = cols.getString("TYPE_NAME");
@@ -68,12 +92,12 @@ public class DBMetadataInspector {
         }
 
         // primary keys
-        try (ResultSet pk = md.getPrimaryKeys(null, schema, table)) {
+        try (ResultSet pk = md.getPrimaryKeys(null, fSchema, fTable)) {
             while (pk.next()) meta.primaryKeys.add(pk.getString("COLUMN_NAME"));
         }
 
         // indexes
-        try (ResultSet ix = md.getIndexInfo(null, schema, table, false, false)) {
+        try (ResultSet ix = md.getIndexInfo(null, fSchema, fTable, false, false)) {
             while (ix.next()) {
                 String iname = ix.getString("INDEX_NAME");
                 String col = ix.getString("COLUMN_NAME");
@@ -85,7 +109,7 @@ public class DBMetadataInspector {
         }
 
         // foreign keys
-        try (ResultSet fk = md.getImportedKeys(null, schema, table)) {
+        try (ResultSet fk = md.getImportedKeys(null, fSchema, fTable)) {
             while (fk.next()) {
                 String pkTable = fk.getString("PKTABLE_NAME");
                 String pkCol = fk.getString("PKCOLUMN_NAME");
@@ -95,7 +119,7 @@ public class DBMetadataInspector {
         }
 
         // table remarks (best-effort via getTables)
-        try (ResultSet t = md.getTables(null, schema, table, null)) {
+        try (ResultSet t = md.getTables(null, fSchema, fTable, null)) {
             if (t.next()) {
                 meta.tableRemarks = t.getString("REMARKS");
             }
@@ -108,12 +132,12 @@ public class DBMetadataInspector {
             if (schema != null) {
                 qc = "SELECT constraint_name, constraint_type FROM information_schema.table_constraints WHERE table_schema = ? AND table_name = ?";
                 ps = conn.prepareStatement(qc);
-                ps.setString(1, schema);
-                ps.setString(2, table);
+                ps.setString(1, fSchema);
+                ps.setString(2, fTable);
             } else {
                 qc = "SELECT constraint_name, constraint_type FROM information_schema.table_constraints WHERE table_name = ?";
                 ps = conn.prepareStatement(qc);
-                ps.setString(1, table);
+                ps.setString(1, fTable);
             }
             try (ResultSet cr = ps.executeQuery()) {
                 while (cr.next()) meta.constraints.add(cr.getString("constraint_name") + ": " + cr.getString("constraint_type"));
@@ -127,12 +151,12 @@ public class DBMetadataInspector {
             if (schema != null) {
                 qc = "SELECT cc.constraint_name, cc.check_clause FROM information_schema.check_constraints cc JOIN information_schema.table_constraints tc ON cc.constraint_name = tc.constraint_name WHERE tc.table_schema = ? AND tc.table_name = ?";
                 ps = conn.prepareStatement(qc);
-                ps.setString(1, schema);
-                ps.setString(2, table);
+                ps.setString(1, fSchema);
+                ps.setString(2, fTable);
             } else {
                 qc = "SELECT cc.constraint_name, cc.check_clause FROM information_schema.check_constraints cc JOIN information_schema.table_constraints tc ON cc.constraint_name = tc.constraint_name WHERE tc.table_name = ?";
                 ps = conn.prepareStatement(qc);
-                ps.setString(1, table);
+                ps.setString(1, fTable);
             }
             try (ResultSet cr = ps.executeQuery()) {
                 while (cr.next()) meta.checks.add(cr.getString("constraint_name") + ": " + cr.getString("check_clause"));
@@ -144,10 +168,10 @@ public class DBMetadataInspector {
                 "SELECT column_name, domain_name, udt_name FROM information_schema.columns WHERE table_schema = ? AND table_name = ?" :
                 "SELECT column_name, domain_name, udt_name FROM information_schema.columns WHERE table_name = ?")) {
             if (schema != null) {
-                ps.setString(1, schema);
-                ps.setString(2, table);
+                ps.setString(1, fSchema);
+                ps.setString(2, fTable);
             } else {
-                ps.setString(1, table);
+                ps.setString(1, fTable);
             }
             try (ResultSet cr = ps.executeQuery()) {
                 while (cr.next()) {
@@ -162,5 +186,12 @@ public class DBMetadataInspector {
         } catch (Throwable ignored) { }
 
         return meta;
+    }
+
+    /** True when the JDBC metadata column lookup for this filter pair yields at least one row. */
+    private static boolean hasColumns(DatabaseMetaData md, String schema, String table) throws SQLException {
+        try (ResultSet cols = md.getColumns(null, schema, table, null)) {
+            return cols.next();
+        }
     }
 }
